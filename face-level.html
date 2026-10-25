@@ -80,6 +80,9 @@ th{font-weight:600;color:var(--muted);font-size:12px}
 .note{font-size:12.5px;color:var(--muted);line-height:1.6}
 .confirm{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px;border-radius:9px;background:var(--bad-soft)}
 details summary{cursor:pointer;font-weight:600;font-size:14px}
+.guide{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--tube)}
+.guide ol{margin:8px 0;padding-left:20px;display:grid;gap:6px;font-size:13.5px}
+.stage .msg{font-size:18px;padding:14px 16px}
 svg text{fill:var(--muted);font-family:var(--font-num);font-size:11px}
 @media (prefers-reduced-motion:reduce){.level .bubble{transition:none}}
 </style>
@@ -118,12 +121,20 @@ svg text{fill:var(--muted);font-family:var(--font-num);font-size:11px}
         </select>
         <label class="sub" for="burstN">연속 프레임</label>
         <select id="burstN"><option>10</option><option selected>20</option><option>30</option></select>
+        <label class="sub"><input type="checkbox" id="voice" checked> 음성 안내</label>
         <label class="sub"><input type="checkbox" id="repeatMode"> 반복 테스트</label>
         <select id="repeatN" aria-label="반복 횟수"><option>5</option><option selected>10</option></select>
       </div>
-      <div class="note">
-        팁: 폰은 거치대에 세우고, 매번 같은 장소·시간·조명에서 찍어요. 처음 측정한 거리·높이가 <b>기준 자세</b>로 저장되고, 다음부터는 그 기준과 같을 때만 찍혀요.
-      </div>
+      <details class="guide" id="guide" open>
+        <summary>쉽게 맞추는 요령 (처음 한 번)</summary>
+        <ol>
+          <li><b>폰 세우기:</b> 거치대나 책·컵에 기대 세워요. 손으로 들면 매번 높이가 달라져요.</li>
+          <li><b>거리 재기:</b> 의자에 등을 붙이고 앉아 <b>팔을 쭉 뻗었을 때 손끝이 폰에 닿는 거리</b>(약 60cm)에 두세요. 내 팔이 자라는 셈이라 매일 똑같아요. 폰 자리를 테이프로 표시해 두면 더 쉬워요.</li>
+          <li><b>높이:</b> 카메라가 눈높이쯤 오게 해요.</li>
+          <li><b>소리 따라 하기:</b> 화면이 멀면 음성 안내를 따라 하세요. 코에서 나온 <b style="color:var(--bad)">빨간 점</b>을 <b style="color:var(--ok)">초록 원</b>에 넣으면 정면이에요.</li>
+        </ol>
+        <div class="note">첫 측정 자세가 <b>기준 자세</b>로 저장되고, 다음부터는 앱이 "앞으로/뒤로", "턱을 드세요"처럼 기준까지 안내해요.</div>
+      </details>
     </section>
 
     <section class="panel" aria-label="촬영 조건">
@@ -229,6 +240,21 @@ function poseFromMatrix(d, layout){
   roll*=sgn;
   return {rollRad:roll, roll:roll*deg, pitch, yaw};
 }
+// 3D 점으로 얼굴이 향하는 방향(화면 좌표 기준) 계산. 레이저 포인터 가이드와 정면 판정에 사용
+// L: 정규화 랜드마크(x,y,z), W/H: 영상 크기. 반환 yaw(+: 화면 오른쪽을 향함), pitch(+: 아래를 향함), 단위 도
+function faceDirection(L, W, H){
+  const v=i=>({x:L[i].x*W, y:L[i].y*H, z:(L[i].z||0)*W});
+  const sub=(a,b)=>({x:a.x-b.x,y:a.y-b.y,z:a.z-b.z});
+  const cross=(a,b)=>({x:a.y*b.z-a.z*b.y, y:a.z*b.x-a.x*b.z, z:a.x*b.y-a.y*b.x});
+  const norm=a=>{const n=Math.hypot(a.x,a.y,a.z)||1; return {x:a.x/n,y:a.y/n,z:a.z/n};};
+  const mid=(a,b)=>({x:(a.x+b.x)/2,y:(a.y+b.y)/2,z:(a.z+b.z)/2});
+  const n1=norm(cross(sub(v(454),v(234)), sub(v(152),v(10))));
+  const n2=norm(cross(sub(v(263),v(33)), sub(mid(v(61),v(291)),v(168))));
+  let f=norm({x:n1.x+n2.x,y:n1.y+n2.y,z:n1.z+n2.z});
+  f={x:-f.x,y:-f.y,z:-f.z};              // 카메라 쪽(작은 z)을 향하게
+  const deg=180/Math.PI;
+  return {yaw:Math.atan2(f.x,-f.z)*deg, pitch:Math.atan2(f.y,-f.z)*deg};
+}
 // 눈꼬리 선 각도(라디안, 화면 기준). 행렬 형식 판별용
 function eyeLineAngle(P){
   const a=P[33], b=P[263]; let ang=Math.atan2(b.y-a.y, b.x-a.x);
@@ -288,7 +314,7 @@ const KEY='face-level-v1';
 const $=id=>document.getElementById(id);
 
 // ---------- 저장 ----------
-function load(){ try{ const s=JSON.parse(localStorage.getItem(KEY)||'null'); if(s&&Array.isArray(s.records)) return s; }catch(e){} return {records:[],ref:null,layout:null,faceCm:null}; }
+function load(){ try{ const s=JSON.parse(localStorage.getItem(KEY)||'null'); if(s&&Array.isArray(s.records)){ if(s.ref&&s.ref.v!==2) s.ref=null; return s; } }catch(e){} return {records:[],ref:null,layout:null,faceCm:null}; }
 let store=load();
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(store)); }catch(e){ setMsg('저장 공간이 부족해요. CSV로 저장한 뒤 오래된 기록을 지워 주세요.'); } }
 
@@ -298,6 +324,14 @@ let phase='aim', holdStart=0, burst=[], burstFails=0, rearmAt=0;
 let repeat={on:false,left:0,id:null};
 let layoutVotes={};
 let history=[];       // 흔들림 확인용 최근 위치
+let lastSpoken='', lastSpokenAt=0;
+function speak(t, force){
+  if(!$('voice').checked || !('speechSynthesis' in window) || !t) return;
+  const now=performance.now();
+  if(!force && (t===lastSpoken ? now-lastSpokenAt<6000 : now-lastSpokenAt<2200)) return;
+  lastSpoken=t; lastSpokenAt=now;
+  try{ speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(t); u.lang='ko-KR'; u.rate=1.05; speechSynthesis.speak(u); }catch(e){}
+}
 const lightCanvas=document.createElement('canvas'); lightCanvas.width=160; lightCanvas.height=120;
 const lctx=lightCanvas.getContext('2d',{willReadFrequently:true});
 const video=$('video'), overlay=$('overlay'), octx=overlay.getContext('2d');
@@ -327,6 +361,7 @@ async function startCamera(){
 }
 $('btnStart').onclick=async()=>{
   $('btnStart').disabled=true;
+  try{ if('speechSynthesis' in window){ const u=new SpeechSynthesisUtterance(''); speechSynthesis.speak(u); } }catch(e){}
   try{
     await Promise.all([landmarker?null:initModel(), startCamera()]);
     $('startCover').hidden=true; running=true; requestAnimationFrame(loop);
@@ -382,6 +417,8 @@ function evaluate(res){
     layout=opts.reduce((a,b)=>(layoutVotes[b]||0)>(layoutVotes[a]||0)?b:a);
   }
   const pose=d?poseFromMatrix(d,layout):{rollRad:eyeLineAngle(P),roll:eyeLineAngle(P)*180/Math.PI,pitch:0,yaw:0};
+  const dir=faceDirection(res.faceLandmarks[0],W,H);
+  pose.yaw=dir.yaw; pose.pitch=dir.pitch; pose.eye=eyeLineAngle(P);
   const m=computeMetrics(P,pose.rollRad);
   const bs={}; (res.faceBlendshapes&&res.faceBlendshapes[0]?res.faceBlendshapes[0].categories:[]).forEach(c=>bs[c.categoryName]=c.score);
   const size=m.fwPx/W;
@@ -395,35 +432,49 @@ function evaluate(res){
   return {face:true,P,pose,m,bs,size,cx,cy,light,motion};
 }
 
+const TOL={dist:7, pos:0.08, posFirst:0.13, yaw:4, pitch:4, pitchFirst:8, roll:3, motion:0.015};
 function checksFor(s){
   const ref=store.ref, list=[];
+  const mirror=$('camSel').value==='user';
   const add=(key,name,ok,val,hint,level)=>list.push({key,name,ok,val,hint,level});
   if(!s.face){ add('face','얼굴 찾기',false,'—','얼굴이 화면에 다 보이게 해 주세요'); return list; }
   add('face','얼굴 찾기',true,'찾음','');
   // 거리
   if(ref){
-    const r=s.size/ref.size;
-    add('dist','거리 (기준과 같게)',Math.abs(r-1)<=0.05,`${((r-1)*100).toFixed(1)}%`, r<0.95?'조금 더 가까이':r>1.05?'조금 더 멀리':'',{v:(r-1)*100,lim:5,span:20});
+    const r=s.size/ref.size, lim=TOL.dist/100;
+    add('dist','거리 (기준과 같게)',Math.abs(r-1)<=lim,`${((r-1)*100).toFixed(1)}%`,
+      r<1-lim?(r<0.85?'한 뼘 정도 앞으로 오세요':'조금만 앞으로 오세요'):r>1+lim?(r>1.15?'한 뼘 정도 뒤로 가세요':'조금만 뒤로 가세요'):'',
+      {v:(r-1)*100,lim:TOL.dist,span:25});
   }else{
-    const okPx=s.m.fwPx>=160, okBig=s.size<=0.6;
-    add('dist','거리',okPx&&okBig,`${Math.round(s.m.fwPx)}px`, !okPx?'너무 멀어요. 점이 부정확해져요':!okBig?'너무 가까워요. 렌즈 왜곡이 커져요':'이 거리가 기준이 돼요');
+    const okPx=s.m.fwPx>=160, okBig=s.size<=0.55;
+    add('dist','거리',okPx&&okBig,`${Math.round(s.m.fwPx)}px`, !okPx?'너무 멀어요. 조금 앞으로 오세요':!okBig?'너무 가까워요. 조금 뒤로 가세요':'좋아요. 이 거리가 기준이 돼요');
   }
   // 위치
-  const tx=ref?ref.cx:0.5, ty=ref?ref.cy:0.45, lim=ref?0.04:0.1;
-  const dx=s.cx-tx, dy=s.cy-ty;
-  add('pos','화면 위치',Math.abs(dx)<=lim&&Math.abs(dy)<=lim,`${(Math.hypot(dx,dy)*100).toFixed(1)}%`, '얼굴을 원 안에 맞춰 주세요');
-  // 자세
-  add('yaw','좌우 돌림',Math.abs(s.pose.yaw)<=3,`${s.pose.yaw.toFixed(1)}°`,'카메라를 정면으로 보세요',{v:s.pose.yaw,lim:3,span:15});
-  const pt=ref?ref.pitch:0, pl=ref?2.5:6;
-  add('pitch',ref?'위아래 (기준과 같게)':'위아래 끄덕임',Math.abs(s.pose.pitch-pt)<=pl,`${(s.pose.pitch-pt).toFixed(1)}°`,'턱 높이를 조절해 주세요',{v:s.pose.pitch-pt,lim:pl,span:15});
-  add('roll','옆으로 기울기',Math.abs(s.pose.roll)<=2,`${s.pose.roll.toFixed(1)}°`,'고개를 똑바로 세워 주세요',{v:s.pose.roll,lim:2,span:10});
+  const tx=ref?ref.cx:0.5, ty=ref?ref.cy:0.45, lim=ref?TOL.pos:TOL.posFirst;
+  const dx=s.cx-tx, dy=s.cy-ty, sdx=mirror?-dx:dx;
+  let ph='얼굴을 원 가운데로 옮겨 주세요';
+  if(mirror){ if(Math.abs(dx)>=Math.abs(dy)) ph= sdx<0?'몸을 오른쪽으로 조금 옮기세요':'몸을 왼쪽으로 조금 옮기세요';
+    else ph= dy<0?'폰을 조금 위로 올리거나 몸을 낮추세요':'폰을 조금 아래로 내리거나 몸을 세우세요'; }
+  add('pos','화면 위치',Math.abs(dx)<=lim&&Math.abs(dy)<=lim,`${(Math.hypot(dx,dy)*100).toFixed(1)}%`, ph);
+  // 정면 (레이저 점)
+  const ty0=ref?ref.yaw:0, tp0=ref?ref.pitch:0, pl=ref?TOL.pitch:TOL.pitchFirst;
+  const ey=s.pose.yaw-ty0, ep=s.pose.pitch-tp0;
+  const yawOk=Math.abs(ey)<=TOL.yaw, pitOk=Math.abs(ep)<=pl;
+  // 화면 오른쪽(원본 영상) = 내 왼쪽. 얼굴이 내 왼쪽을 보면 오른쪽으로 돌리라고 안내
+  const yawHint= ey>0?'고개를 오른쪽으로 살짝 돌리세요':'고개를 왼쪽으로 살짝 돌리세요';
+  const pitHint= ep>0?'턱을 살짝 드세요':'턱을 살짝 당기세요';
+  add('yaw','좌우 돌림',yawOk,`${ey.toFixed(1)}°`, yawHint+' (빨간 점을 초록 원 안으로)',{v:ey,lim:TOL.yaw,span:15});
+  add('pitch',ref?'위아래 (기준과 같게)':'위아래',pitOk,`${ep.toFixed(1)}°`, pitHint+' (빨간 점을 초록 원 안으로)',{v:ep,lim:pl,span:15});
+  // 기울기: 눈꼬리 선 기준 방향 안내 (+면 내 왼쪽이 낮음)
+  const rollHint= s.pose.eye>0?'고개를 오른쪽 어깨 쪽으로 살짝 기울이세요':'고개를 왼쪽 어깨 쪽으로 살짝 기울이세요';
+  add('roll','옆으로 기울기',Math.abs(s.pose.roll)<=TOL.roll,`${s.pose.roll.toFixed(1)}°`, rollHint+' (파란 선을 수평선에)',{v:s.pose.roll,lim:TOL.roll,span:12});
   // 조명
   const lok=s.light.mean>=60&&s.light.mean<=215&&s.light.ratio>=0.85;
-  add('light','조명',lok,`좌우 ${Math.round(s.light.ratio*100)}%`, s.light.mean<60?'너무 어두워요':s.light.mean>215?'너무 밝아요':s.light.ratio<0.85?'한쪽에 그림자가 있어요. 빛을 정면에서':'');
+  add('light','조명',lok,`좌우 ${Math.round(s.light.ratio*100)}%`, s.light.mean<60?'너무 어두워요. 불을 켜 주세요':s.light.mean>215?'너무 밝아요':s.light.ratio<0.85?'한쪽에 그림자가 있어요. 빛을 정면에서 받아 주세요':'');
   // 표정
   const smile=Math.max(s.bs.mouthSmileLeft||0,s.bs.mouthSmileRight||0), jaw=s.bs.jawOpen||0, blink=Math.max(s.bs.eyeBlinkLeft||0,s.bs.eyeBlinkRight||0);
   add('expr','무표정',smile<0.25&&jaw<0.12&&blink<0.45,'', smile>=0.25?'웃음을 풀어 주세요':jaw>=0.12?'입을 다물어 주세요':blink>=0.45?'눈을 떠 주세요':'');
-  add('still','멈춤',s.motion<0.012,'', '잠깐 그대로 멈춰 주세요');
+  add('still','멈춤',s.motion<TOL.motion,'', '잠깐 그대로 멈춰 주세요');
   return list;
 }
 
@@ -455,7 +506,8 @@ function drawOverlay(s,allOk){
   const W=overlay.width,H=overlay.height; octx.clearRect(0,0,W,H);
   // 목표 원
   const ref=store.ref, tx=(ref?ref.cx:0.5)*W, ty=(ref?ref.cy:0.45)*H;
-  const rw=(ref?ref.size:0.3)*W*0.62;
+  const curSize=s.face?Math.max(0.18,Math.min(0.55,s.size)):0.3;
+  const rw=(ref?ref.size:curSize)*W*0.62;
   octx.lineWidth=Math.max(2,W/400);
   octx.strokeStyle=allOk?'rgba(60,199,156,.95)':'rgba(255,255,255,.7)';
   octx.setLineDash([W/80,W/120]);
@@ -464,16 +516,31 @@ function drawOverlay(s,allOk){
   const P=s.P, r=Math.max(2,W/360);
   octx.fillStyle='rgba(255,255,255,.85)';
   [IDX.rFace,IDX.lFace,IDX.chin,IDX.nasion,IDX.noseTip,IDX.rMouth,IDX.lMouth,...IDX.rEye,...IDX.lEye,IDX.rJaw,IDX.lJaw].forEach(i=>{octx.beginPath();octx.arc(P[i].x,P[i].y,r,0,Math.PI*2);octx.fill();});
-  // 보정된 중심선
-  const c=P[IDX.nasion], a=s.pose.rollRad+Math.PI/2, L=s.m.fwPx*1.1;
-  octx.strokeStyle='rgba(111,179,211,.9)'; octx.beginPath();
-  octx.moveTo(c.x-Math.cos(a)*L*0.4,c.y-Math.sin(a)*L*0.4); octx.lineTo(c.x+Math.cos(a)*L,c.y+Math.sin(a)*L); octx.stroke();
+  // 레이저 포인터: 코끝에서 얼굴이 향하는 방향으로 빔
+  const K=s.m.fwPx*2.2, rad=Math.PI/180, n=P[IDX.noseTip];
+  const tyaw=ref?ref.yaw:0, tpit=ref?ref.pitch:0;
+  const goal={x:n.x+Math.tan(tyaw*rad)*K, y:n.y+Math.tan(tpit*rad)*K};
+  const dot={x:n.x+Math.tan(s.pose.yaw*rad)*K, y:n.y+Math.tan(s.pose.pitch*rad)*K};
+  const aimOk=Math.abs(s.pose.yaw-tyaw)<=TOL.yaw && Math.abs(s.pose.pitch-tpit)<=(ref?TOL.pitch:TOL.pitchFirst);
+  octx.lineWidth=Math.max(3,W/300);
+  octx.strokeStyle=aimOk?'rgba(60,199,156,.95)':'rgba(60,199,156,.75)';
+  octx.beginPath(); octx.arc(goal.x,goal.y,Math.tan(TOL.yaw*rad)*K,0,Math.PI*2); octx.stroke();
+  octx.strokeStyle='rgba(238,90,80,.55)'; octx.beginPath(); octx.moveTo(n.x,n.y); octx.lineTo(dot.x,dot.y); octx.stroke();
+  octx.fillStyle=aimOk?'rgba(60,199,156,1)':'rgba(238,90,80,1)';
+  octx.beginPath(); octx.arc(dot.x,dot.y,Math.max(6,W/120),0,Math.PI*2); octx.fill();
+  // 수평계: 이마 위 고정 수평선(흰색)과 얼굴 기울기 선(파란색)
+  const c=P[IDX.top], L=s.m.fwPx*0.6, a=s.pose.rollRad, rollOk=Math.abs(s.pose.roll)<=TOL.roll;
+  octx.lineWidth=Math.max(2,W/400);
+  octx.strokeStyle='rgba(255,255,255,.75)'; octx.beginPath(); octx.moveTo(c.x-L,c.y-W/60); octx.lineTo(c.x+L,c.y-W/60); octx.stroke();
+  octx.lineWidth=Math.max(3,W/280);
+  octx.strokeStyle=rollOk?'rgba(60,199,156,.95)':'rgba(111,179,211,.95)'; octx.beginPath();
+  octx.moveTo(c.x-Math.cos(a)*L,c.y-W/60-Math.sin(a)*L); octx.lineTo(c.x+Math.cos(a)*L,c.y-W/60+Math.sin(a)*L); octx.stroke();
 }
 
 function setRing(frac){ $('ring').hidden=frac<=0; $('ringArc').setAttribute('stroke-dashoffset',String(138.2*(1-Math.min(1,frac)))); }
 function resetAim(){ phase='aim'; holdStart=0; burst=[]; burstFails=0; setRing(0); }
 
-const HOLD=700;
+const HOLD=500;
 function step(res){
   const s=evaluate(res), list=checksFor(s), allOk=list.every(c=>c.ok);
   renderChecks(list); drawOverlay(s,allOk);
@@ -481,13 +548,13 @@ function step(res){
   if(phase==='rest'){ if(now>=rearmAt){ resetAim(); } else { setMsg(`잠깐 쉬어요… 다음 측정 ${Math.ceil((rearmAt-now)/1000)}초 뒤 (${repeat.left}회 남음)`); return; } }
   if(phase==='done'){ return; }
   if(phase==='aim'){
-    if(allOk){ if(!holdStart) holdStart=now; const f=(now-holdStart)/HOLD; setRing(f*0.3); setMsg('좋아요, 그대로…'); if(f>=1){ phase='burst'; burst=[]; burstFails=0; } }
-    else { holdStart=0; setRing(0); const bad=list.find(c=>!c.ok); setMsg(bad?(bad.hint||bad.name+' 확인'):''); }
+    if(allOk){ if(!holdStart){ holdStart=now; speak('좋아요, 그대로 멈추세요',true); } const f=(now-holdStart)/HOLD; setRing(f*0.3); setMsg('좋아요, 그대로…'); if(f>=1){ phase='burst'; burst=[]; burstFails=0; } }
+    else { holdStart=0; setRing(0); const bad=list.find(c=>!c.ok); const t=bad?(bad.hint||bad.name+' 확인'):''; setMsg(t); speak(t.replace(/\s*\(.*\)$/,'')); }
     return;
   }
   if(phase==='burst'){
     const N=+$('burstN').value;
-    if(allOk){ burst.push(s.m); } else if(++burstFails>Math.ceil(N/4)){ resetAim(); setMsg('움직임이 있어서 다시 맞출게요'); return; }
+    if(allOk){ burst.push(s.m); } else if(++burstFails>Math.ceil(N/3)){ resetAim(); setMsg('움직임이 있어서 다시 맞출게요'); return; }
     setRing(0.3+0.7*burst.length/N); setMsg(`측정 중… ${burst.length}/${N}`);
     if(burst.length>=N) finish(s);
   }
@@ -505,18 +572,19 @@ function finish(s){
     cond:{yaw:+s.pose.yaw.toFixed(2),pitch:+s.pose.pitch.toFixed(2),roll:+s.pose.roll.toFixed(2),size:+s.size.toFixed(4),light:+s.light.ratio.toFixed(3)},
     cam:$('camSel').value, repeatId:repeat.on?repeat.id:null, img:thumb()};
   let newRef=false;
-  if(!store.ref){ store.ref={size:s.size,cx:s.cx,cy:s.cy,pitch:s.pose.pitch,cam:$('camSel').value,t:rec.t}; newRef=true; }
+  if(!store.ref){ store.ref={v:2,size:s.size,cx:s.cx,cy:s.cy,pitch:s.pose.pitch,yaw:0,cam:$('camSel').value,t:rec.t}; newRef=true; }
   store.records.push(rec); save();
   renderAll();
   setRing(1);
   if(repeat.on){
     repeat.left--;
-    if(repeat.left>0){ phase='rest'; rearmAt=performance.now()+2500; return; }
+    if(repeat.left>0){ speak(`${repeat.left}번 남았어요`,true); phase='rest'; rearmAt=performance.now()+2500; return; }
     repeat.on=false; $('repeatMode').checked=false; $('consScope').value='last';
     renderConsistency();
   }
   phase='done';
   setMsg(newRef?'측정 완료! 이 자세가 기준 자세로 저장됐어요.':'측정 완료!');
+  speak(newRef?'측정 완료. 기준 자세로 저장했어요':'측정 완료',true);
   setTimeout(()=>{ if(phase==='done') resetAim(); }, 3500);
 }
 
