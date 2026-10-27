@@ -1158,9 +1158,16 @@ function finishFront(){
   frontTries.push(one);
   const last=!session.queue[session.i+1]||session.queue[session.i+1].kind!=='front';
   if(!last){ speak(`${it.try}번째 등록 완료`,true); nextItem(); return; }
-  const T=frontTries, m3=k=>median(T.map(x=>x[k])), rng=k=>Math.max(...T.map(x=>x[k]))-Math.min(...T.map(x=>x[k]));
+  // 3번이 4° 넘게 다르면 한 번은 고개가 돌아간 채 등록된 것 → 추가 등록(최대 2번) 후 서로 가장 가까운 3개만 쓴다
+  const best3=a=>{ if(a.length<=3) return a; let b=null,bs=1e9; for(let i=0;i<a.length;i++) for(let j=i+1;j<a.length;j++) for(let k=j+1;k<a.length;k++){ const t=[a[i],a[j],a[k]], sp=Math.max(...t.map(x=>x.yaw))-Math.min(...t.map(x=>x.yaw))+Math.max(...t.map(x=>x.pitch))-Math.min(...t.map(x=>x.pitch)); if(sp<bs){bs=sp;b=t;} } return b; };
+  const cand=best3(frontTries), spr=Math.max(Math.max(...cand.map(x=>x.yaw))-Math.min(...cand.map(x=>x.yaw)), Math.max(...cand.map(x=>x.pitch))-Math.min(...cand.map(x=>x.pitch)));
+  if(spr>4 && frontTries.length<5){
+    const n=frontTries.length+1; session.queue.splice(session.i+1,0,{kind:'front',try:n,label:KIND_NAME.front+` 추가 ${n-3}`,target:{front:true}});
+    speak('한 번이 많이 달랐어요. 한 번 더 등록할게요',true); nextItem(); return;
+  }
+  const T=cand, allTries=frontTries, m3=k=>median(T.map(x=>x[k])), rng=k=>Math.max(...T.map(x=>x[k]))-Math.min(...T.map(x=>x[k]));
   store.front={yaw:m3('yaw'),pitch:m3('pitch'),roll:m3('roll'),sdYaw:median(T.map(x=>x.sdYaw)),sdPitch:median(T.map(x=>x.sdPitch)),n:T.reduce((a,x)=>a+x.n,0),
-    tries:T.map(x=>({yaw:+x.yaw.toFixed(2),pitch:+x.pitch.toFixed(2),roll:+x.roll.toFixed(2)})),spreadYaw:rng('yaw'),spreadPitch:rng('pitch'),t:new Date().toISOString()};
+    tries:T.map(x=>({yaw:+x.yaw.toFixed(2),pitch:+x.pitch.toFixed(2),roll:+x.roll.toFixed(2)})),dropped:allTries.filter(x=>!T.includes(x)).map(x=>({yaw:+x.yaw.toFixed(2),pitch:+x.pitch.toFixed(2)})),spreadYaw:rng('yaw'),spreadPitch:rng('pitch'),t:new Date().toISOString()};
   store.ref={v:3,size:m3('size'),cx:m3('cx'),cy:m3('cy'),yaw:store.front.yaw,pitch:store.front.pitch,roll:store.front.roll,cam:$('camSel').value,t:store.front.t};
   frontTries=[]; save();
   const sp=Math.max(store.front.spreadYaw,store.front.spreadPitch);
@@ -1410,8 +1417,8 @@ function csvFor(profiles){
   for(const [n] of sets) for(const k of keys) head.push(n+'_'+k, n+'_'+k+'_sd');
   const EF=['eye','mouth','chin','nose','width','fwPx'];
   for(const f of ['f06','f10']) for(const k of EF) head.push('E'+f+'_'+k);
-  head.push(...METHODS.map(M=>'정답오차_'+M), ...METHODS.map(M=>'뒤집기_'+M));
-  const TAIL=METHODS.length*2;
+  head.push(...METHODS.map(M=>'정답오차_'+M), ...METHODS.map(M=>'뒤집기_'+M), ...METHODS.map(M=>'감도_'+M));
+  const TAIL=METHODS.length*3;
   const rows=[head.join(',')];
   for(const p of profiles){
     const fr=p.front||{}, fu=frontUncertainty(p.front,p.frontChecks), n2=v=>v!=null?v.toFixed(2):'';
@@ -1427,7 +1434,7 @@ function csvFor(profiles){
     for(const t of p.truth){
       const row=[...pre,t.t,dayKey(t.t),t.day??'','정답시험','','','','',t.mmpp?t.mmpp.toFixed(5):''];
       while(row.length<head.length-TAIL) row.push('');
-      row.push(...METHODS.map(M=>t.err&&t.err[M]!=null?t.err[M].toFixed(4):''), ...METHODS.map(M=>t.flip&&t.flip[M]!=null?t.flip[M].toFixed(4):''));
+      row.push(...METHODS.map(M=>t.err&&t.err[M]!=null?t.err[M].toFixed(4):''), ...METHODS.map(M=>t.flip&&t.flip[M]!=null?t.flip[M].toFixed(4):''), ...METHODS.map(M=>t.gain&&t.gain[M]!=null?t.gain[M].toFixed(4):''));
       rows.push(row.map(csvq).join(','));
     }
     for(const c of (p.frontChecks||[])){
@@ -1482,16 +1489,17 @@ async function runTruth(){
     const t=document.createElement('table'); const h=t.createTHead().insertRow();
     ['옮긴 양(정답)','A 미간선','B 수직선','C 거울 겹치기','D 3D 보정','E 3D 거울'].forEach(x=>{const th=document.createElement('th'); th.textContent=x; h.appendChild(th);});
     const b=t.createTBody(); const errs={A:[],B:[],C:[],D:[],E:[]};
-    for(const mmShift of [1,2,3]){
+    const gains={A:[],B:[],C:[],D:[],E:[]};
+    for(const mmShift of [1,2,3,5]){
       const cv=warpChin(lastNormalFrame, base.P[IDX.chin], base.A.fwPx*0.35, mmShift/base.mmpp);
       const r=analyzeImage(cv); const tr=b.insertRow(); const c0=tr.insertCell(); c0.textContent=mmShift+'mm'; c0.className='lbl';
       for(const k of METHODS){
         const c=tr.insertCell(); if(!r){ c.textContent='—'; continue; }
         const got=(r[k].chin*r[k].fwPx-base[k].chin*base[k].fwPx)/100*base.mmpp;
-        errs[k].push(Math.abs(got-mmShift)); c.textContent=got.toFixed(2)+'mm';
+        if(mmShift<=3) errs[k].push(Math.abs(got-mmShift)); gains[k].push(got/mmShift); c.textContent=got.toFixed(2)+'mm';
       }
     }
-    const err={}; for(const k of METHODS) err[k]=errs[k].length?mean(errs[k]):null;
+    const err={}, gain={}; for(const k of METHODS){ err[k]=errs[k].length?mean(errs[k]):null; gain[k]=gains[k].length?mean(gains[k]):null; }
     // 좌우 뒤집기 시험: 뒤집은 사진은 값이 정확히 반대(+2 → -2)여야 한다. 더해서 0이 아닌 만큼이 계산의 한쪽 치우침
     const fl=analyzeImage(flipCanvas(lastNormalFrame), true), flip={};
     { const tr=b.insertRow(); const c0=tr.insertCell(); c0.textContent='뒤집기 치우침'; c0.className='lbl';
@@ -1499,11 +1507,12 @@ async function runTruth(){
         flip[k]=mean(KEY4.map(q=>Math.abs(base[k][q]*base[k].fwPx*base.mmpp + fl[k][q]*fl[k].fwPx*fl.mmpp)/2/100));
         c.textContent=flip[k].toFixed(2)+'mm'; c.className=flip[k]<=0.5?'pass':'fail'; } }
     const cap=t.createCaption(); cap.className='note';
-    cap.textContent=`정답에 가까울수록 정확해요. 평균 오차: `+METHODS.map(k=>`${k} ${err[k]!=null?err[k].toFixed(2):'—'}mm`).join(', ')+`. B·C는 턱 근처 점도 중심선 계산에 쓰여서, 턱이 움직이면 중심선도 조금 따라가 값이 작게 나올 수 있어요. 마지막 줄은 같은 사진을 좌우로 뒤집어 잰 결과로, 0에 가까워야 계산이 한쪽으로 기울지 않은 거예요.`;
+    cap.textContent=`정답에 가까울수록 정확해요. 평균 오차: `+METHODS.map(k=>`${k} ${err[k]!=null?err[k].toFixed(2):'—'}mm`).join(', ')+`. B·C는 턱 근처 점도 중심선 계산에 쓰여서, 턱이 움직이면 중심선도 조금 따라가 값이 작게 나올 수 있어요. 감도는 옮긴 양 중 몇 %를 알아챘는지예요(100%가 이상적). 마지막 줄은 같은 사진을 좌우로 뒤집어 잰 결과로, 0에 가까워야 계산이 한쪽으로 기울지 않은 거예요.`;
     const w=document.createElement('div'); w.className='tablewrap'; w.appendChild(t);
+    cap.textContent='감도: '+METHODS.map(k=>`${k} ${gain[k]!=null?Math.round(gain[k]*100):'—'}%`).join(', ')+'. '+cap.textContent;
     note.textContent=`${new Date().toLocaleString('ko-KR')} · 1px = ${base.mmpp.toFixed(3)}mm (홍채 기준). 턱끝 주변만 부드럽게 옮긴 사진으로 시험했어요.`;
     box.appendChild(w);
-    store.truth.push({t:new Date().toISOString(),day:dayNum(),mmpp:base.mmpp,err,flip}); save();
+    store.truth.push({t:new Date().toISOString(),day:dayNum(),mmpp:base.mmpp,err,flip,gain}); save();
     renderToday(); renderSummary();
   }catch(e){ note.textContent='시험 중 문제가 생겼어요: '+(e&&e.message||e); }
   finally{ $('btnTruth').disabled=!lastNormalFrame; }
