@@ -34,7 +34,7 @@ h2{font-size:15px;margin:0;font-weight:600}
 .sub{color:var(--muted);font-size:13px}
 .grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:20px;align-items:start}
 @media (max-width:860px){.grid{grid-template-columns:minmax(0,1fr)}}
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;display:grid;gap:14px;min-width:0}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;display:grid;grid-template-columns:minmax(0,1fr);gap:14px;min-width:0}
 .stagewrap{border-radius:14px;transition:padding .2s,background .2s}
 .stagewrap.lit{background:#fff;padding:22px;box-shadow:0 0 0 1px var(--line)}
 .stage{position:relative;width:100%;background:#000;border-radius:10px;overflow:hidden;aspect-ratio:4/3}
@@ -126,6 +126,26 @@ svg text{fill:var(--muted);font-family:var(--font-num);font-size:11px}
     <div class="sub" id="engineState">준비 전</div>
   </header>
 
+  <section class="panel" aria-label="측정 대상">
+    <div class="row" style="justify-content:space-between">
+      <div class="row">
+        <label class="sub" for="who">측정 대상</label>
+        <select id="who"></select>
+        <span class="tag" id="whoMode"></span>
+      </div>
+      <button id="btnAddPerson">+ 사람 추가</button>
+    </div>
+    <div id="addPerson" hidden class="memo">
+      <div class="row">
+        <input type="text" id="pName" placeholder="이름 대신 번호나 별명 (예: 참가자 2)">
+        <select id="pMode" aria-label="실험 종류"><option value="guest">1회 정밀도 테스트 (약 5분)</option><option value="study">4주 실험</option></select>
+      </div>
+      <label class="sub"><input type="checkbox" id="pConsent"> 무엇을 왜 재는지 설명했고, 사진 없이 숫자만 기록하는 데 동의를 받았어요</label>
+      <div class="row"><button class="primary" id="btnAddOk" disabled>추가하고 바꾸기</button><button id="btnAddNo">취소</button></div>
+      <div class="note">기록은 이 폰에만 저장돼요. 측정이 끝나면 "CSV로 저장"으로 그 사람 숫자만 보내고, 원하면 그 사람을 삭제하세요.</div>
+    </div>
+  </section>
+
   <section class="panel today" aria-label="오늘의 실험">
     <div class="dayhead">
       <div class="daynum" id="dayNum">1일<small id="dayWeek">1주차</small></div>
@@ -184,6 +204,7 @@ svg text{fill:var(--muted);font-family:var(--font-num);font-size:11px}
           <li><b>폰 세우기:</b> 거치대나 책·컵에 기대 세워요. 손으로 들면 매번 높이가 달라져요.</li>
           <li><b>거리:</b> 의자에 등을 붙이고 앉아 <b>팔을 쭉 뻗어 손끝이 폰에 닿는 거리</b>(약 60cm). 폰 자리를 테이프로 표시해 두면 매일 똑같아요.</li>
           <li><b>높이:</b> 카메라가 눈높이쯤 오게 해요.</li>
+          <li><b>개인 정면 등록 (처음 한 번):</b> 편하게 앉아 폰 위쪽 <b>카메라 렌즈</b>를 3초 바라보면, 그 자세가 나만의 정면이 돼요. 억지로 똑바로 하지 말고 평소처럼요.</li>
           <li><b>소리 따라 하기:</b> 코에서 나온 <b style="color:var(--bad)">빨간 점</b>을 <b style="color:var(--ok)">초록 원</b>에 넣으면 돼요. 실험 측정 때는 초록 원이 옆으로 옮겨가요.</li>
           <li><b>조명:</b> 따로 맞추지 않아도 돼요. 앱이 밝기만 기록해요. 셀카 모드에서는 화면 테두리가 하얗게 빛나서 조명 역할을 해요(폰 밝기를 올리면 더 좋아요).</li>
         </ol>
@@ -196,7 +217,7 @@ svg text{fill:var(--muted);font-family:var(--font-num);font-size:11px}
         <span class="tag" id="refTag">기준 자세 없음</span>
       </div>
       <div class="checks" id="checks"></div>
-      <div class="note">초록불이 다 켜지면 자동으로 20장을 찍어 한 번의 측정으로 저장해요. 조명은 기록만 하고 막지 않아요.</div>
+      <div class="note">초록불이 다 켜지면 자동으로 20장을 찍어 한 번의 측정으로 저장해요. 조명은 기록만 하고 막지 않아요. 각도는 모두 <b>개인 정면</b> 기준이에요.</div>
     </section>
   </div>
 
@@ -244,12 +265,13 @@ svg text{fill:var(--muted);font-family:var(--font-num);font-size:11px}
       <h2>기록</h2>
       <div class="row">
         <button id="btnCsv">CSV로 저장</button>
-        <button class="danger" id="btnClear">전체 삭제</button>
+        <button id="btnCsvAll">모든 사람 CSV</button>
+        <button class="danger" id="btnClear">기록 지우기</button>
       </div>
     </div>
     <div class="note">주말마다 CSV로 저장해서 Claude에게 보내 주세요. 기록은 이 브라우저에만 있어요.</div>
     <div id="clearConfirm" hidden class="confirm">
-      <span>모든 기록, 메모, 기준 자세를 지울까요? 되돌릴 수 없어요.</span>
+      <span id="clearText">이 사람의 기록, 메모, 개인 정면을 지울까요? 되돌릴 수 없어요.</span>
       <button class="danger" id="btnClearYes">지우기</button>
       <button id="btnClearNo">취소</button>
     </div>
@@ -261,12 +283,22 @@ svg text{fill:var(--muted);font-family:var(--font-num);font-size:11px}
     <div class="row">
       <label class="sub" for="burstN">한 번 측정할 때 찍는 장수</label>
       <select id="burstN"><option>10</option><option selected>20</option><option>30</option></select>
-      <button id="btnResetRef">기준 자세 다시 정하기</button>
+      <button id="btnResetRef">개인 정면 다시 등록</button>
     </div>
     <div class="row">
       <label class="sub" for="faceCm">내 얼굴 너비(cm)</label>
       <input type="number" id="faceCm" min="10" max="20" step="0.1" placeholder="예: 14">
       <span class="note">홍채가 안 잡힐 때만 mm 계산에 쓰여요.</span>
+    </div>
+    <div class="note">개인 정면을 다시 등록하면 이전 측정과 기준이 달라져서, 실험 중간에는 되도록 하지 않는 게 좋아요.</div>
+    <div class="row">
+      <button class="danger" id="btnDelPerson">이 사람 삭제</button>
+      <span class="note" id="delPersonNote"></span>
+    </div>
+    <div id="delConfirm" hidden class="confirm">
+      <span id="delText"></span>
+      <button class="danger" id="btnDelYes">삭제</button>
+      <button id="btnDelNo">취소</button>
     </div>
   </details>
 
@@ -275,6 +307,7 @@ svg text{fill:var(--muted);font-family:var(--font-num);font-size:11px}
     <div class="note">
       · 얼굴에 점 478개를 찍는 MediaPipe 얼굴 인식 모델을 써요.<br>
       · 눈·눈썹·입꼬리: 좌우 높이 차이. 턱끝·코끝: 세로 중심선에서 벗어난 거리. 좌우 폭: (오른쪽−왼쪽) ÷ (합). mm 환산은 홍채 지름 11.7mm 가정.<br>
+      · 개인 정면: 얼굴 점으로 계산한 '정면'은 비대칭인 얼굴에서 살짝 틀어질 수 있어요. 그래서 렌즈를 편하게 바라본 자세를 그 사람의 0°로 등록하고, 안내와 D 보정을 모두 그 기준으로 해요.<br>
       · 계산 방식 네 가지: A 미간을 지나는 선(기울기 보정), B 화면 세로선과 좌우 짝 점 220쌍의 가운데, C 얼굴을 좌우 반전해 가장 잘 겹치는 축(거울 겹치기), D 3D 점으로 고개 좌우·위아래 돌림을 되돌린 뒤 미간선. 중심선에 턱끝을 넣지 않는 건, 턱이 틀어지면 기준도 같이 틀어지기 때문이에요.<br>
       · 흑백 보정: 흑백으로 바꾸고 명암을 칸마다 고르게 펴서(CLAHE) 그림자 영향을 줄여 봐요. 얼굴 인식 AI는 컬러 사진으로 배워서 오히려 나빠질 수도 있어서, 실험으로 비교해요.<br>
       · 사진 기반 추정치예요. 의료기기가 아니며 질병 여부를 판단하지 않아요. 통증이나 급한 변화가 있으면 병원 확인이 먼저예요.
@@ -331,13 +364,15 @@ function faceDirection(L, W, H){
 // 3D 점을 돌려서 '정면에서 본 얼굴'로 되돌린다 (고개 좌우·위아래 돌림 보정)
 // 표준 얼굴에서 이 계산법이 내놓는 기본 끄덕임 각도(점 고르는 방식 때문에 생기는 고정 차이)
 const PITCH0=Math.atan(0.0686);
-function frontalize(L, W, H){
+// yaw0·pitch0: 그 사람의 '개인 정면'에서 잰 각도(라디안). 이 자세로 되돌린다 (없으면 계산상 정면)
+function frontalize(L, W, H, yaw0, pitch0){
+  if(yaw0==null) yaw0=0; if(pitch0==null) pitch0=PITCH0;
   const f=faceVector(L,W,H), c={x:L[168].x*W, y:L[168].y*H, z:(L[168].z||0)*W};
-  // 1) 끄덕임 되돌리기 (X축 회전): 기본 각도만 남기고 되돌린다
-  const pit=Math.atan2(f.y,-f.z)-PITCH0, cb=Math.cos(pit), sb=Math.sin(pit);
+  // 1) 끄덕임 되돌리기 (X축 회전)
+  const pit=Math.atan2(f.y,-f.z)-pitch0, cb=Math.cos(pit), sb=Math.sin(pit);
   const fy1=f.y*cb+f.z*sb, fz1=-f.y*sb+f.z*cb;
   // 2) 좌우 돌림 되돌리기 (Y축 회전)
-  const yaw=Math.atan2(f.x,-fz1), ca=Math.cos(yaw), sa=Math.sin(yaw);
+  const yaw=Math.atan2(f.x,-fz1)-yaw0, ca=Math.cos(yaw), sa=Math.sin(yaw);
   return L.map(p=>{
     const x=p.x*W-c.x, y=p.y*H-c.y, z=(p.z||0)*W-c.z;
     const y1=y*cb+z*sb, z1=-y*sb+z*cb;
@@ -346,9 +381,21 @@ function frontalize(L, W, H){
   });
 }
 // 기준선 D: 3D로 고개 돌림을 되돌린 뒤 A와 같은 방식(미간선)으로 계산
-function computeMetricsD(L, W, H, rollRad){
-  const F=frontalize(L,W,H), c=F[IDX.nasion], Q=transform(F,rollRad,c);
+function computeMetricsD(L, W, H, rollRad, front){
+  const r=Math.PI/180, F=frontalize(L,W,H, front?front.yaw*r:0, front?front.pitch*r:PITCH0), c=F[IDX.nasion], Q=transform(F,rollRad,c);
   return frameMetrics(Q, Q[IDX.nasion].x);
+}
+// 시선: 검은 눈동자가 눈 가운데에서 얼마나 벗어났나 (눈 너비 대비). 0이면 정면을 봄
+function gazeOffset(P){
+  if(P.length<478) return null;
+  const one=(o,i,up,dn)=>{
+    const a=P[o], b=P[i], m={x:(a.x+b.x)/2,y:(a.y+b.y)/2}, w=dist(a,b)||1;
+    const c1=P[468], c2=P[473], ir=dist(c1,m)<dist(c2,m)?c1:c2;
+    const ux=(b.x-a.x)/w, uy=(b.y-a.y)/w, lid={x:(P[up].x+P[dn].x)/2,y:(P[up].y+P[dn].y)/2};
+    return {x:Math.abs((ir.x-m.x)*ux+(ir.y-m.y)*uy)/w, y:((ir.y-lid.y)*ux-(ir.x-lid.x)*uy)/w};
+  };
+  const R=one(33,133,159,145), L=one(263,362,386,374);
+  return {x:(R.x+L.x)/2, y:(R.y+L.y)/2};
 }
 // 눈꼬리 선 각도(라디안, 화면 기준). 행렬 형식 판별용
 function eyeLineAngle(P){
@@ -450,7 +497,12 @@ function verdict(sdPct){ if (sdPct<=0.3) return ['ok','안정']; if (sdPct<=0.7)
 function dayKey(t){ const d=new Date(t); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 const W2=[['고개 좌우 2°','고개 좌우 4°','고개 좌우 6°'],['끄덕임 위','끄덕임 아래'],['더 가까이','더 멀리'],['측면 조명','옆으로 기울임'],['살짝 웃음','안경'],['다른 폰'],['저녁 시간']];
 const BASIC=[{k:'normal',n:3},{k:'repeat',n:10},{k:'clahe',n:3},{k:'truth'},{k:'memo'}];
-function planFor(day){
+const GUEST=[{k:'normal',n:3},{k:'repeat',n:10},{k:'truth'},{k:'memo'}];
+function planFor(day, mode){
+  if(mode==='guest'){
+    if(day<=1) return {week:0, name:'1회 정밀도 테스트', goal:'정면 등록 → 정상 3번 → 반복 10번 → 정답 시험으로, 이 사람 얼굴에서도 앱이 정확한지 봐요. 약 5분.', steps:GUEST};
+    return {week:0, name:'추가 측정', goal:'테스트는 끝났어요. 더 재면 날마다 흔들림도 볼 수 있어요.', steps:[{k:'normal',n:3}]};
+  }
   if(day<=7)  return {week:1, name:'기본 저울 검사', goal:'앱이 매번 같은 숫자를 내는지(흔들림)와, 일부러 옮긴 2mm를 맞히는지(정답) 봐요.', steps:BASIC};
   if(day<=14){
     const c=W2[day-8], steps=[{k:'normal',n:3}];
@@ -541,23 +593,34 @@ const MODEL='https://storage.googleapis.com/mediapipe-models/face_landmarker/fac
 const KEY='face-level-v1';
 const $=id=>document.getElementById(id);
 
-// ---------- 저장 ----------
-function load(){
-  let s=null;
-  try{ s=JSON.parse(localStorage.getItem(KEY)||'null'); }catch(e){}
-  if(!s||!Array.isArray(s.records)) s={records:[],ref:null,layout:null,faceCm:null};
-  if(s.ref&&s.ref.v!==2) s.ref=null;
-  s.days=s.days||{}; s.truth=s.truth||[]; s.manual=s.manual||{}; s.showM=s.showM||'D';
-  return s;
+// ---------- 저장 (사람별) ----------
+const DBKEY='face-level-db';
+function normProfile(p,name,mode){
+  p=p||{}; p.name=p.name||name||'이름 없음'; p.mode=p.mode||mode||'study';
+  p.records=p.records||[]; if(p.ref&&p.ref.v!==3) p.ref=null;
+  p.days=p.days||{}; p.truth=p.truth||[]; p.manual=p.manual||{}; p.front=p.front||null; p.faceCm=p.faceCm??null;
+  delete p.layout; delete p.showM; p.created=p.created||new Date().toISOString(); return p;
 }
-let store=load();
-function save(){ try{ localStorage.setItem(KEY, JSON.stringify(store)); }catch(e){ setMsg('저장 공간이 부족해요. CSV로 저장한 뒤 오래된 기록을 지워 주세요.'); } }
+function loadDB(){
+  let d=null; try{ d=JSON.parse(localStorage.getItem(DBKEY)||'null'); }catch(e){}
+  if(!d||!d.profiles){
+    let old=null; try{ old=JSON.parse(localStorage.getItem(KEY)||'null'); }catch(e){}
+    d={profiles:{}, cur:'p1', layout:(old&&old.layout)||null, showM:(old&&old.showM)||'D'};
+    d.profiles.p1=normProfile(old&&Array.isArray(old.records)?old:{}, '나', 'study');
+  }
+  for(const id in d.profiles) d.profiles[id]=normProfile(d.profiles[id]);
+  if(!d.profiles[d.cur]) d.cur=Object.keys(d.profiles)[0];
+  d.showM=d.showM||'D';
+  return d;
+}
+let db=loadDB(), store=db.profiles[db.cur];
+function save(){ try{ localStorage.setItem(DBKEY, JSON.stringify(db)); }catch(e){ setMsg('저장 공간이 부족해요. CSV로 저장한 뒤 오래된 기록이나 사람을 지워 주세요.'); } }
 
 // ---------- 상태 ----------
 let landmarker=null, FL=null, files=null, imgLandmarker=null, stream=null, running=false, lastVideoTime=-1;
 let phase='idle', holdStart=0, burst=[], burstFails=0, rearmAt=0;
 let session=null;                 // {queue:[...], i}
-let layoutVotes={}, history=[], lastSpoken='', lastSpokenAt=0, tilt={v:null,t:0}, lastNormalFrame=null;
+let reg=null, layoutVotes={}, history=[], lastSpoken='', lastSpokenAt=0, tilt={v:null,t:0}, lastNormalFrame=null;
 const lightCanvas=document.createElement('canvas'); lightCanvas.width=160; lightCanvas.height=120;
 const lctx=lightCanvas.getContext('2d',{willReadFrequently:true});
 const proc=document.createElement('canvas'), pctx=proc.getContext('2d',{willReadFrequently:true});
@@ -597,7 +660,7 @@ const TAG_SAY={
   '측면 조명':'한쪽 옆에서만 빛이 오게 해 주세요. 스탠드나 창문 쪽으로 몸을 돌리면 돼요',
   '안경':'안경을 쓰고 평소처럼 측정해요','저녁 시간':'저녁에 평소처럼 측정해요'
 };
-const KIND_NAME={normal:'정상 측정',repeat:'반복 측정',clahe:'흑백 보정 측정',cond:'실험 측정',extra:'추가 측정'};
+const KIND_NAME={front:'개인 정면 등록',normal:'정상 측정',repeat:'반복 측정',clahe:'흑백 보정 측정',cond:'실험 측정',extra:'추가 측정'};
 
 // ---------- 오늘의 실험 ----------
 const today=()=>dayKey(Date.now());
@@ -606,6 +669,7 @@ function dayNum(){ const d=protoDates(), i=d.indexOf(today()); return i>=0?i+1:d
 function todayCount(kind, tag){ const t=today(); return store.records.filter(r=>r.kind===kind&&dayKey(r.t)===t&&(tag==null||r.tag===tag)).length; }
 function stepState(st){
   const t=today();
+  if(st.k==='front') return {done:!!store.front, text:'개인 정면 등록 (처음 한 번)', hint:'편하게 앉아 폰 카메라 렌즈를 3초 바라보기'};
   if(st.k==='memo') return {done:!!store.days[t], text:'한 줄 메모', hint:'잠·술·짠 음식, 불편했던 점'};
   if(st.k==='truth') return {done:store.truth.some(x=>dayKey(x.t)===t), text:'정답 시험', hint:'측정이 끝나면 자동으로 해요'};
   if(st.k==='manual') return {done:!!store.manual[t], text:'다른 폰으로 측정', hint:st.text, manual:true};
@@ -614,7 +678,8 @@ function stepState(st){
   return {done:n>=st.n, text:name, hint, count:`${Math.min(n,st.n)}/${st.n}`};
 }
 function buildQueue(){
-  const plan=planFor(dayNum()), q=[];
+  const plan=planFor(dayNum(),store.mode), q=[];
+  if(!store.front) q.push({kind:'front',label:KIND_NAME.front,target:{front:true}});
   for(const st of plan.steps){
     if(st.k==='normal'||st.k==='clahe'){ for(let i=todayCount(st.k);i<st.n;i++) q.push({kind:st.k,prep:st.k==='clahe',label:KIND_NAME[st.k]}); }
     else if(st.k==='repeat'){ const rid='R'+Date.now(); for(let i=todayCount('repeat');i<st.n;i++) q.push({kind:'repeat',repeatId:rid,label:KIND_NAME.repeat}); }
@@ -623,13 +688,14 @@ function buildQueue(){
   return q;
 }
 function renderToday(){
-  const d=dayNum(), plan=planFor(d);
+  const d=dayNum(), plan=planFor(d,store.mode);
   $('dayNum').firstChild.nodeValue=`${d}일`;
-  $('dayWeek').textContent=plan.week<=4?`${plan.week}주차 · 28일 중`:'실험 완료';
+  $('dayWeek').textContent=store.mode==='guest'?'1회 테스트':plan.week<=4?`${plan.week}주차 · 28일 중`:'실험 완료';
   $('weekName').textContent=plan.name; $('weekGoal').textContent=plan.goal;
   const ul=$('steps'); ul.innerHTML='';
   const cur=session&&phase!=='idle'?session.queue[session.i]:null;
-  for(const st of plan.steps){
+  const steps=(store.front?[]:[{k:'front'}]).concat(plan.steps);
+  for(const st of steps){
     const s=stepState(st), li=document.createElement('li');
     const isNow=cur&&((st.k===cur.kind)&&(st.k!=='cond'||st.tag===cur.tag));
     li.className=(s.done?'done':'')+(isNow?' now':'');
@@ -705,7 +771,8 @@ $('camSel').onchange=async()=>{ applyRing(); if(running){ await startCamera(); h
 function curItem(){ return session&&phase!=='idle'?session.queue[session.i]:null; }
 function announce(item, first){
   const pre=first?'시작할게요. ':'';
-  let t= item.kind==='cond' ? `${pre}다음은 실험 측정이에요. ${TAG_SAY[item.tag]||''}`
+  let t= item.kind==='front' ? `${pre}개인 정면 등록이에요. 편하게 앉아서, 폰 카메라 렌즈를 바라보세요. 고개는 억지로 맞추지 않아도 돼요`
+       : item.kind==='cond' ? `${pre}다음은 실험 측정이에요. ${TAG_SAY[item.tag]||''}`
        : item.kind==='repeat' ? `${pre}반복 측정이에요. 자리에서 움직이지 말고 그대로 계세요`
        : item.kind==='clahe' ? `${pre}흑백 보정 측정이에요. 같은 자세로 계세요`
        : `${pre}정면을 보고 빨간 점을 초록 원에 넣으세요`;
@@ -720,7 +787,8 @@ $('btnGo').onclick=async()=>{
   if(!ok) return;
   let q=buildQueue();
   if(!q.length) q=[{kind:'extra',label:KIND_NAME.extra}];
-  session={queue:q,i:0}; phase='aim'; holdStart=0; burst=[];
+  reg=null;
+  session={queue:q,i:0}; phase='aim'; holdStart=0; burst=[]; renderPeople();
   $('stage').scrollIntoView({behavior:'smooth',block:'center'});
   announce(q[0],true); renderToday();
 };
@@ -733,10 +801,10 @@ function nextItem(){
   if(changed) announce(item,false); else { $('stepBadge').textContent=`${item.label} · ${session.i+1}/${session.queue.length}`; }
 }
 async function endSession(finished){
-  phase='idle'; session=null; setRing(0); $('stepBadge').hidden=true;
+  phase='idle'; session=null; reg=null; setRing(0); $('stepBadge').hidden=true; renderPeople();
   renderToday();
   if(!finished){ setMsg('멈췄어요. 이어서 하려면 위의 버튼을 누르세요.'); return; }
-  const plan=planFor(dayNum());
+  const plan=planFor(dayNum(),store.mode);
   const needTruth=plan.steps.some(s=>s.k==='truth') && !store.truth.some(x=>dayKey(x.t)===today());
   if(needTruth&&lastNormalFrame){ setMsg('측정 끝! 정답 시험을 하는 중이에요…'); await runTruth(); }
   const memoNeeded=!store.days[today()];
@@ -781,15 +849,15 @@ function evaluate(res){
   const L=res.faceLandmarks[0], P=L.map(p=>({x:p.x*W,y:p.y*H}));
   const d=res.facialTransformationMatrixes&&res.facialTransformationMatrixes[0]?res.facialTransformationMatrixes[0].data:null;
   const opts=['col+','row+','col-','row-'];
-  let layout=store.layout||'col+';
-  if(d && !store.layout){
+  let layout=db.layout||'col+';
+  if(d && !db.layout){
     const e=eyeLineAngle(P);
     if(Math.abs(e)>0.05){
       let best=opts[0],bd=1e9;
       for(const o of opts){ const dd=Math.abs(poseFromMatrix(d,o).rollRad-e); if(dd<bd){bd=dd;best=o;} }
       layoutVotes[best]=(layoutVotes[best]||0)+1;
       const total=opts.reduce((t,o)=>t+(layoutVotes[o]||0),0);
-      if(total>=15){ store.layout=opts.reduce((a,b)=>(layoutVotes[b]||0)>(layoutVotes[a]||0)?b:a); save(); }
+      if(total>=15){ db.layout=opts.reduce((a,b)=>(layoutVotes[b]||0)>(layoutVotes[a]||0)?b:a); save(); }
     }
     layout=opts.reduce((a,b)=>(layoutVotes[b]||0)>(layoutVotes[a]||0)?b:a);
   }
@@ -797,7 +865,7 @@ function evaluate(res){
   const dir=faceDirection(L,W,H);
   pose.yaw=dir.yaw; pose.pitch=dir.pitch; pose.eye=eyeLineAngle(P);
   const m=computeMetrics(P,pose.rollRad);
-  const frame={A:m, B:computeMetricsB(P), C:computeMetricsC(P), D:computeMetricsD(L,W,H,pose.rollRad), mmpp:mmPerPx(P)};
+  const frame={A:m, B:computeMetricsB(P), C:computeMetricsC(P), D:computeMetricsD(L,W,H,pose.rollRad,store.front), mmpp:mmPerPx(P)};
   const bs={}; (res.faceBlendshapes&&res.faceBlendshapes[0]?res.faceBlendshapes[0].categories:[]).forEach(c=>bs[c.categoryName]=c.score);
   const size=m.fwPx/W, cx=P[IDX.nasion].x/W, cy=P[IDX.nasion].y/H;
   const light=cheekLight(P);
@@ -805,7 +873,7 @@ function evaluate(res){
   if(history.length>8) history.shift();
   const rng=k=>Math.max(...history.map(h=>h[k]))-Math.min(...history.map(h=>h[k]));
   const motion=history.length<8?1:Math.max(rng('x'),rng('y'),rng('cx'),rng('cy'))/m.fwPx;
-  return {face:true,P,pose,m,frame,bs,size,cx,cy,light,motion};
+  return {face:true,P,pose,m,frame,bs,size,cx,cy,light,motion,gaze:gazeOffset(P)};
 }
 
 const TOL={level:2, dist:7, pos:0.08, posFirst:0.13, yaw:4, pitch:4, pitchFirst:8, roll:3, motion:0.015, aim:1.5};
@@ -819,6 +887,20 @@ function checksFor(s,T){
   const add=(key,name,ok,val,hint,level,info)=>list.push({key,name,ok,val,hint,level,info});
   if(!s.face){ add('face','얼굴 찾기',false,'—','얼굴이 화면에 다 보이게 해 주세요'); return list; }
   add('face','얼굴 찾기',true,'찾음','');
+  if(T.front){
+    const hasT=tilt.v!=null && performance.now()-tilt.t<1500;
+    if(hasT) add('level','폰 수평',Math.abs(tilt.v)<=TOL.level,`${tilt.v.toFixed(1)}°`,'폰을 좌우로 기울지 않게 똑바로 세워 주세요',{v:tilt.v,lim:TOL.level,span:10});
+    const okPx=s.m.fwPx>=160, okBig=s.size<=0.55;
+    add('dist','거리',okPx&&okBig,`${Math.round(s.m.fwPx)}px`, !okPx?'너무 멀어요. 조금 앞으로 오세요':!okBig?'너무 가까워요. 조금 뒤로 가세요':'좋아요. 이 거리가 기준이 돼요');
+    const dx=s.cx-0.5, dy=s.cy-0.45;
+    add('pos','화면 위치',Math.abs(dx)<=TOL.posFirst&&Math.abs(dy)<=TOL.posFirst,`${(Math.hypot(dx,dy)*100).toFixed(1)}%`,'얼굴이 화면 가운데쯤 오게 해 주세요');
+    const gz=s.gaze, gok=gz&&gz.x<=0.10&&Math.abs(gz.y)<=0.22;
+    add('gaze','렌즈 바라보기',!!gok,gz?`${Math.round(gz.x*100)}`:'—','화면 말고 폰 위쪽의 카메라 렌즈를 바라보세요');
+    const smile=Math.max(s.bs.mouthSmileLeft||0,s.bs.mouthSmileRight||0), jaw=s.bs.jawOpen||0, blink=Math.max(s.bs.eyeBlinkLeft||0,s.bs.eyeBlinkRight||0);
+    add('expr','무표정',smile<0.25&&jaw<0.12&&blink<0.45,'', smile>=0.25?'웃음을 풀어 주세요':jaw>=0.12?'입을 다물어 주세요':'눈을 떠 주세요');
+    add('still','멈춤',s.motion<TOL.motion,'','잠깐 그대로 멈춰 주세요');
+    return list;
+  }
   const hasTilt=tilt.v!=null && performance.now()-tilt.t<1500;
   if(hasTilt) add('level','폰 수평',Math.abs(tilt.v)<=TOL.level,`${tilt.v.toFixed(1)}°`,'폰을 좌우로 기울지 않게 똑바로 세워 주세요',{v:tilt.v,lim:TOL.level,span:10});
   // 거리
@@ -844,12 +926,14 @@ function checksFor(s,T){
   add('yaw',T.yaw?`목표: 고개 ${T.yaw}° 돌리기`:'좌우 돌림',Math.abs(ey)<=yl,`${ey.toFixed(1)}°`,(ey>0?'고개를 오른쪽으로 살짝 돌리세요':'고개를 왼쪽으로 살짝 돌리세요')+' (빨간 점을 초록 원 안으로)',{v:ey,lim:yl,span:15});
   add('pitch',T.pitch?`목표: 턱 ${T.pitch<0?'들기':'당기기'}`:(ref?'위아래 (기준과 같게)':'위아래'),Math.abs(ep)<=pl,`${ep.toFixed(1)}°`,(ep>0?'턱을 살짝 드세요':'턱을 살짝 당기세요')+' (빨간 점을 초록 원 안으로)',{v:ep,lim:pl,span:15});
   // 기울기
+  const r0=ref&&ref.roll!=null?ref.roll:0, rr=s.pose.roll-r0;
   if(T.roll){
-    const e=Math.abs(s.pose.roll)-T.roll;
+    const e=Math.abs(rr)-T.roll;
     add('roll',`목표: 고개 ${T.roll}° 기울이기`,Math.abs(e)<=TOL.aim,`${s.pose.roll.toFixed(1)}°`, e<0?'고개를 조금 더 기울이세요':'조금 덜 기울이세요',{v:e,lim:TOL.aim,span:8});
   }else{
     const rollHint= s.pose.eye>0?'고개를 오른쪽 어깨 쪽으로 살짝 기울이세요':'고개를 왼쪽 어깨 쪽으로 살짝 기울이세요';
-    add('roll','옆으로 기울기',Math.abs(s.pose.roll)<=TOL.roll,`${s.pose.roll.toFixed(1)}°`, rollHint+' (파란 선을 흰 선에)',{v:s.pose.roll,lim:TOL.roll,span:12});
+    const rh= rr>0?'고개를 오른쪽 어깨 쪽으로 살짝 기울이세요':'고개를 왼쪽 어깨 쪽으로 살짝 기울이세요';
+    add('roll',ref?'옆으로 기울기 (내 정면과 같게)':'옆으로 기울기',Math.abs(rr)<=TOL.roll,`${rr.toFixed(1)}°`, (ref?rh:rollHint)+' (파란 선을 흰 선에)',{v:rr,lim:TOL.roll,span:12});
   }
   // 조명: 막지 않고 기록만
   const lgood=s.light.mean>=60&&s.light.mean<=215&&s.light.ratio>=0.85;
@@ -894,6 +978,14 @@ function drawOverlay(s,allOk,T){
   const P=s.P, r=Math.max(2,W/360);
   octx.fillStyle='rgba(255,255,255,.85)';
   [IDX.rFace,IDX.lFace,IDX.chin,IDX.nasion,IDX.noseTip,IDX.rMouth,IDX.lMouth,...IDX.rEye,...IDX.lEye,IDX.rJaw,IDX.lJaw].forEach(i=>{octx.beginPath();octx.arc(P[i].x,P[i].y,r,0,Math.PI*2);octx.fill();});
+  if(T&&T.front){
+    // 카메라 렌즈 쪽(화면 위)을 가리키는 화살표
+    const ax=W/2, ay=H*0.04, sz=W/22;
+    octx.fillStyle='rgba(60,199,156,.95)';
+    octx.beginPath(); octx.moveTo(ax,ay); octx.lineTo(ax-sz,ay+sz*1.2); octx.lineTo(ax+sz,ay+sz*1.2); octx.closePath(); octx.fill();
+    octx.fillRect(ax-sz*0.35,ay+sz*1.2,sz*0.7,sz*1.4);
+    return;
+  }
   // 레이저 포인터
   const K=s.m.fwPx*2.2, rad=Math.PI/180, n=P[IDX.noseTip], g=goalAngles(T);
   const yl=T&&T.yaw?TOL.aim:TOL.yaw;
@@ -907,9 +999,10 @@ function drawOverlay(s,allOk,T){
   octx.fillStyle=aimOk?'rgba(60,199,156,1)':'rgba(238,90,80,1)';
   octx.beginPath(); octx.arc(dot.x,dot.y,Math.max(6,W/120),0,Math.PI*2); octx.fill();
   // 수평계
-  const c=P[IDX.top], L=s.m.fwPx*0.6, a=s.pose.rollRad, rollOk=Math.abs(s.pose.roll)<=TOL.roll;
+  const r0=ref&&ref.roll!=null?ref.roll*rad:0, c=P[IDX.top], L=s.m.fwPx*0.6, a=s.pose.rollRad, rollOk=Math.abs(s.pose.roll-(ref&&ref.roll||0))<=TOL.roll;
   octx.lineWidth=Math.max(2,W/400);
-  octx.strokeStyle='rgba(255,255,255,.75)'; octx.beginPath(); octx.moveTo(c.x-L,c.y-W/60); octx.lineTo(c.x+L,c.y-W/60); octx.stroke();
+  octx.strokeStyle='rgba(255,255,255,.75)'; octx.beginPath();
+  octx.moveTo(c.x-Math.cos(r0)*L,c.y-W/60-Math.sin(r0)*L); octx.lineTo(c.x+Math.cos(r0)*L,c.y-W/60+Math.sin(r0)*L); octx.stroke();
   octx.lineWidth=Math.max(3,W/280);
   octx.strokeStyle=rollOk?'rgba(60,199,156,.95)':'rgba(111,179,211,.95)'; octx.beginPath();
   octx.moveTo(c.x-Math.cos(a)*L,c.y-W/60-Math.sin(a)*L); octx.lineTo(c.x+Math.cos(a)*L,c.y-W/60+Math.sin(a)*L); octx.stroke();
@@ -927,6 +1020,15 @@ function step(res){
     if(now>=rearmAt){ phase='aim'; holdStart=0; }
     else { setMsg(`다음 측정 준비… ${Math.ceil((rearmAt-now)/1000)}초`); return; }
   }
+  if(phase==='aim' && it && it.kind==='front'){
+    if(allOk){
+      if(!reg){ reg={f:[],t0:now}; speak('좋아요. 그대로 렌즈를 3초만 바라보세요',true); }
+      reg.f.push({yaw:s.pose.yaw,pitch:s.pose.pitch,roll:s.pose.roll,size:s.size,cx:s.cx,cy:s.cy,gx:s.gaze?s.gaze.x:null});
+      const fr=(now-reg.t0)/3000; setRing(fr); setMsg(`정면 등록 중… ${Math.max(1,Math.ceil(3-(now-reg.t0)/1000))}초`);
+      if(fr>=1&&reg.f.length>=10) finishFront();
+    } else { reg=null; setRing(0); const bad=list.find(c=>!c.ok); const t=bad?(bad.hint||bad.name+' 확인'):''; setMsg(t); speak(t); }
+    return;
+  }
   if(phase==='aim'){
     if(allOk){ if(!holdStart){ holdStart=now; speak('좋아요, 그대로 멈추세요',true); } const f=(now-holdStart)/HOLD; setRing(f*0.3); setMsg('좋아요, 그대로…'); if(f>=1){ phase='burst'; burst=[]; burstFails=0; } }
     else { holdStart=0; setRing(0); const bad=list.find(c=>!c.ok); const t=bad?(bad.hint||bad.name+' 확인'):''; setMsg(t); speak(t.replace(/\s*\(.*\)$/,'')); }
@@ -939,6 +1041,14 @@ function step(res){
     if(burst.length>=N) finish(s);
   }
 }
+function finishFront(){
+  const F=reg.f, md=k=>median(F.map(x=>x[k])); reg=null;
+  store.front={yaw:md('yaw'),pitch:md('pitch'),roll:md('roll'),sdYaw:sd(F.map(x=>x.yaw)),sdPitch:sd(F.map(x=>x.pitch)),n:F.length,t:new Date().toISOString()};
+  store.ref={v:3,size:md('size'),cx:md('cx'),cy:md('cy'),yaw:store.front.yaw,pitch:store.front.pitch,roll:store.front.roll,cam:$('camSel').value,t:store.front.t};
+  save(); setRing(1);
+  speak('정면 등록 완료. 이제 이 자세가 기준이에요',true);
+  renderAll(); nextItem();
+}
 function snap(w){
   const c=document.createElement('canvas'); c.width=w; c.height=Math.round(w*video.videoHeight/video.videoWidth);
   c.getContext('2d').drawImage(video,0,0,c.width,c.height); return c;
@@ -948,26 +1058,25 @@ function finish(s){
   const sA=summarize(burst.map(f=>f.A)), sB=summarize(burst.map(f=>f.B)), sC=summarize(burst.map(f=>f.C)), sD=summarize(burst.map(f=>f.D));
   const mm=burst.map(f=>f.mmpp).filter(v=>v), mmpp=mm.length?median(mm):null;
   if(it.kind==='normal'||it.kind==='repeat'||it.kind==='extra'){ lastNormalFrame=snap(video.videoWidth); $('btnTruth').disabled=false; }
-  let img=''; try{ img=snap(160).toDataURL('image/jpeg',0.6); }catch(e){}
+  let img=''; if(it.kind!=='repeat'&&it.kind!=='clahe'){ try{ img=snap(96).toDataURL('image/jpeg',0.55); }catch(e){} }
   const rec={id:Date.now(), v:4, t:new Date().toISOString(), day:dayNum(), kind:it.kind, tag:it.tag||'', prep:!!it.prep, repeatId:it.repeatId||null,
     m:sA.m, sd:sA.sd, mB:sB.m, sdB:sB.sd, mC:sC.m, sdC:sC.sd, mD:sD.m, sdD:sD.sd, mmpp,
     level:(tilt.v!=null&&performance.now()-tilt.t<1500)?+tilt.v.toFixed(2):null, n:burst.length,
     cond:{yaw:+s.pose.yaw.toFixed(2),pitch:+s.pose.pitch.toFixed(2),roll:+s.pose.roll.toFixed(2),size:+s.size.toFixed(4),light:+s.light.ratio.toFixed(3),lightMean:Math.round(s.light.mean)},
     cam:$('camSel').value, img};
-  let newRef=false;
-  if(!store.ref&&(it.kind==='normal'||it.kind==='extra')){ store.ref={v:2,size:s.size,cx:s.cx,cy:s.cy,pitch:s.pose.pitch,yaw:0,cam:$('camSel').value,t:rec.t}; newRef=true; }
+  rec.person=store.name;
   store.records.push(rec); save();
   setRing(1);
-  if(newRef) speak('첫 측정 완료. 이 자세를 기준으로 저장했어요',true);
   renderAll();
   nextItem();
 }
 
 // ---------- 결과 화면 ----------
 function faceCm(){ const v=parseFloat($('faceCm').value); return v>=10&&v<=20?v:null; }
-$('faceCm').value=store.faceCm||'';
+function syncProfileInputs(){ $('faceCm').value=store.faceCm||''; }
+syncProfileInputs();
 $('faceCm').oninput=()=>{ store.faceCm=faceCm(); save(); renderLatest(); };
-$('showM').value=store.showM; $('showM').onchange=()=>{ store.showM=$('showM').value; save(); renderLatest(); renderTrend(); };
+$('showM').value=db.showM; $('showM').onchange=()=>{ db.showM=$('showM').value; save(); renderLatest(); renderTrend(); };
 function toMM(r, pct, m){ m=m||r.m; if(r.mmpp) return pct/100*m.fwPx*r.mmpp; const cm=faceCm(); return cm?pct/100*cm*10:null; }
 function fmt(v,dec){ return (v>=0?'+':'')+v.toFixed(dec); }
 const KEYS6=['eye','brow','mouth','chin','nose','width'];
@@ -975,7 +1084,7 @@ function renderLatest(){
   const box=$('metrics'); box.innerHTML=''; $('methodBox').innerHTML='';
   const r=store.records[store.records.length-1];
   if(!r){ $('lastWhen').textContent='아직 없음'; const p=document.createElement('div'); p.className='note'; p.textContent='오늘 측정을 시작하면 여기에 결과가 나와요.'; box.appendChild(p); return; }
-  const M=store.showM, m=r[MK[M]]||r.m, sdv=r['sd'+(M==='A'?'':M)]||r.sd;
+  const M=db.showM, m=r[MK[M]]||r.m, sdv=r['sd'+(M==='A'?'':M)]||r.sd;
   $('lastWhen').textContent=new Date(r.t).toLocaleString('ko-KR')+` · ${KIND_NAME[r.kind]||'측정'}${r.tag?' ('+r.tag+')':''}`+(r.mmpp?' · 홍채 자 사용':'');
   for(const d of METRICS){
     const v=m[d.k]; if(v==null) continue;
@@ -1011,12 +1120,12 @@ function renderLatest(){
 function cellMM(td, v){ if(v==null){ td.textContent='—'; return; } td.textContent='±'+v.toFixed(2)+'mm'; td.className=v<=0.5?'pass':'fail'; }
 function renderSummary(){
   const dates=protoDates(), d=dayNum();
-  $('progText').textContent=`${dates.length}일 기록 · 목표 28일`;
+  $('progText').textContent=store.mode==='guest'?`${store.name} · 1회 테스트`:`${store.name} · ${dates.length}일 기록 · 목표 28일`;
   const dots=$('dots'); dots.innerHTML='';
   for(let i=1;i<=28;i++){ const s=document.createElement('span'); if(i<=dates.length) s.className='on'; if(i===d) s.className+=' cur'; dots.appendChild(s); }
   const box=$('sumBox'); box.innerHTML='';
   const S=expSummary(store.records, store.truth);
-  if(!S.n.days&&!S.n.repeatSets&&!S.n.truth){ const p=document.createElement('div'); p.className='note'; p.textContent='측정이 쌓이면 여기에 실험 결과가 정리돼요. 합격선은 모두 0.5mm예요.'; box.appendChild(p); return; }
+  if(!S.n.days&&!S.n.repeatSets&&!S.n.truth){ const p=document.createElement('div'); p.className='note'; p.textContent='측정이 쌓이면 여기에 실험 결과가 정리돼요. 합격선은 모두 0.5mm예요.'; box.appendChild(p); renderPeopleSummary(box); return; }
   // 방식별 핵심 결과
   const t=document.createElement('table'); const h=t.createTHead().insertRow();
   ['검사 (합격 0.5mm)','A 미간선','B 수직선','C 거울 겹치기','D 3D 보정'].forEach(x=>{const th=document.createElement('th'); th.textContent=x; h.appendChild(th);});
@@ -1045,11 +1154,12 @@ function renderSummary(){
     cap2.textContent='그날 정상 측정과 비교해 숫자가 얼마나 달라졌는지예요. 0.5mm를 넘는 실수는 앱이 막거나 계산으로 보정해야 해요.';
     const w2=document.createElement('div'); w2.className='tablewrap'; w2.appendChild(t2); box.appendChild(w2);
   }
+  renderPeopleSummary(box);
 }
 
 function renderTrend(){
   const box=$('trend'); box.innerHTML='';
-  const M=store.showM, g=groupBy(store.records.filter(r=>(r.kind==='normal'||(!r.kind&&r.m))&&r.mmpp&&r[MK[M]]), r=>dayKey(r.t));
+  const M=db.showM, g=groupBy(store.records.filter(r=>(r.kind==='normal'||(!r.kind&&r.m))&&r.mmpp&&r[MK[M]]), r=>dayKey(r.t));
   const days=Object.keys(g).sort();
   if(days.length<2){ const p=document.createElement('div'); p.className='note'; p.textContent='이틀 이상 측정하면 날짜별 그래프가 그려져요.'; box.appendChild(p); return; }
   const vals=days.map(k=>mean(g[k].map(r=>mean(KEY4.map(q=>Math.abs(recMM(r,M,q))))))) ;
@@ -1088,42 +1198,94 @@ function renderHist(){
 }
 function renderRef(){
   const tag=$('refTag');
-  if(store.ref){ tag.className='tag ok'; tag.textContent='기준 자세 있음 · '+new Date(store.ref.t).toLocaleDateString('ko-KR'); }
-  else { tag.className='tag warn'; tag.textContent='기준 자세 없음 (첫 측정 때 저장)'; }
+  if(store.front){ tag.className='tag ok'; tag.textContent=`${store.name}의 정면 등록됨 · 좌우 ${store.front.yaw.toFixed(1)}° 위아래 ${store.front.pitch.toFixed(1)}°`; }
+  else { tag.className='tag warn'; tag.textContent='개인 정면 미등록 (측정 시작 때 먼저 해요)'; }
 }
-function renderAll(){ renderToday(); renderLatest(); renderSummary(); renderTrend(); renderHist(); renderRef(); }
+function renderAll(){ renderPeople(); renderToday(); renderLatest(); renderSummary(); renderTrend(); renderHist(); renderRef(); }
 
-$('btnResetRef').onclick=()=>{ store.ref=null; save(); renderRef(); };
+$('btnResetRef').onclick=()=>{ store.ref=null; store.front=null; save(); renderAll(); };
 $('btnClear').onclick=()=>{ $('clearConfirm').hidden=false; };
 $('btnClearNo').onclick=()=>{ $('clearConfirm').hidden=true; };
-$('btnClearYes').onclick=()=>{ store={records:[],ref:null,layout:store.layout,faceCm:store.faceCm,days:{},truth:[],manual:{},showM:store.showM}; save(); $('clearConfirm').hidden=true; renderAll(); };
+$('btnClearYes').onclick=()=>{ db.profiles[db.cur]=normProfile({name:store.name,mode:store.mode,faceCm:store.faceCm,created:store.created}); store=db.profiles[db.cur]; lastNormalFrame=null; save(); $('clearConfirm').hidden=true; renderAll(); };
+
+// ---------- 사람 ----------
+function renderPeople(){
+  const sel=$('who'); sel.innerHTML='';
+  for(const [id,p] of Object.entries(db.profiles)){ const o=document.createElement('option'); o.value=id; o.textContent=p.name; sel.appendChild(o); }
+  sel.value=db.cur; sel.disabled=!!(session&&phase!=='idle');
+  $('whoMode').className='tag '+(store.mode==='guest'?'warn':'ok'); $('whoMode').textContent=store.mode==='guest'?'1회 테스트':'4주 실험';
+  $('btnDelPerson').disabled=Object.keys(db.profiles).length<2;
+  $('delPersonNote').textContent=Object.keys(db.profiles).length<2?'사람이 한 명뿐이면 삭제할 수 없어요.':'';
+}
+function switchTo(id){
+  if(!db.profiles[id]) return;
+  db.cur=id; store=db.profiles[id]; lastNormalFrame=null; reg=null; $('btnTruth').disabled=true; $('truthBox').innerHTML='';
+  save(); syncProfileInputs(); renderAll();
+}
+$('who').onchange=()=>switchTo($('who').value);
+$('btnAddPerson').onclick=()=>{ $('addPerson').hidden=false; $('pName').value=`참가자 ${Object.keys(db.profiles).length+1}`; $('pConsent').checked=false; $('btnAddOk').disabled=true; };
+$('btnAddNo').onclick=()=>{ $('addPerson').hidden=true; };
+$('pConsent').onchange=()=>{ $('btnAddOk').disabled=!$('pConsent').checked; };
+$('btnAddOk').onclick=()=>{
+  const name=$('pName').value.trim()||`참가자 ${Object.keys(db.profiles).length+1}`;
+  const id='p'+Date.now();
+  db.profiles[id]=normProfile({consent:new Date().toISOString()}, name, $('pMode').value);
+  $('addPerson').hidden=true; switchTo(id);
+};
+$('btnDelPerson').onclick=()=>{ $('delText').textContent=`"${store.name}"의 모든 기록을 지우고 목록에서 뺄까요? 되돌릴 수 없어요.`; $('delConfirm').hidden=false; };
+$('btnDelNo').onclick=()=>{ $('delConfirm').hidden=true; };
+$('btnDelYes').onclick=()=>{ delete db.profiles[db.cur]; $('delConfirm').hidden=true; switchTo(Object.keys(db.profiles)[0]); };
+
+function renderPeopleSummary(box){
+  const ids=Object.keys(db.profiles); if(ids.length<2) return;
+  const t=document.createElement('table'); const h=t.createTHead().insertRow();
+  ['사람별 비교 (D 방식)','측정일','반복 흔들림','날마다 흔들림','정답 오차','가장 좋은 방식'].forEach(x=>{const th=document.createElement('th'); th.textContent=x; h.appendChild(th);});
+  const b=t.createTBody();
+  for(const id of ids){
+    const p=db.profiles[id], S=expSummary(p.records,p.truth), D=S.methods.D, tr=b.insertRow();
+    const c0=tr.insertCell(); c0.textContent=p.name+(p.front?'':' (정면 미등록)'); c0.className='lbl';
+    tr.insertCell().textContent=S.n.days+'일';
+    for(const v of [D.repeat,D.daily,D.truth]) cellMM(tr.insertCell(), v);
+    tr.insertCell().textContent=S.best||'—';
+  }
+  const cap=t.createCaption(); cap.className='note'; cap.textContent='사람마다 결과가 비슷하면 "누구에게나 통한다"는 증거가 쌓여요. 합격선은 0.5mm.';
+  const w=document.createElement('div'); w.className='tablewrap'; w.appendChild(t); box.appendChild(w);
+}
 
 // ---------- CSV ----------
 const csvq=v=>{ const s=String(v??''); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
-$('btnCsv').onclick=()=>{
+function csvFor(profiles){
   const keys=METRICS.map(d=>d.k);
-  const head=['시간','날짜','실험일차','종류','조건','흑백보정','반복ID','카메라','mm_per_px','폰기울기','yaw','pitch','roll','size','조명_좌우','조명_밝기','잠','술','짠음식','메모'];
+  const head=['사람','실험종류','정면_좌우','정면_위아래','정면_기울기','시간','날짜','실험일차','종류','조건','흑백보정','반복ID','카메라','mm_per_px','폰기울기','yaw','pitch','roll','size','조명_좌우','조명_밝기','잠','술','짠음식','메모'];
   const sets=[['A','m','sd'],['B','mB','sdB'],['C','mC','sdC'],['D','mD','sdD']];
   for(const [n] of sets) for(const k of keys) head.push(n+'_'+k, n+'_'+k+'_sd');
   head.push('정답오차_A','정답오차_B','정답오차_C','정답오차_D');
   const rows=[head.join(',')];
-  for(const r of store.records){
-    const dk=dayKey(r.t), memo=store.days[dk]||{};
-    const row=[r.t,dk,r.day??'',r.kind||'이전버전',r.tag||'',r.prep?1:0,r.repeatId||'',r.cam,r.mmpp?r.mmpp.toFixed(5):'',r.level??'',r.cond.yaw,r.cond.pitch,r.cond.roll,r.cond.size,r.cond.light,r.cond.lightMean??'',memo.sleep??'',memo.alcohol?1:'',memo.salty?1:'',memo.note||''];
-    for(const [,mk,sk] of sets) for(const k of keys){ const m=r[mk], sdv=r[sk]; row.push(m&&m[k]!=null?m[k].toFixed(4):'', sdv&&sdv[k]!=null?sdv[k].toFixed(4):''); }
-    row.push('','','','');
-    rows.push(row.map(csvq).join(','));
+  for(const p of profiles){
+    const fr=p.front||{}, pre=[p.name,p.mode==='guest'?'1회':'4주',fr.yaw!=null?fr.yaw.toFixed(2):'',fr.pitch!=null?fr.pitch.toFixed(2):'',fr.roll!=null?fr.roll.toFixed(2):''];
+    for(const r of p.records){
+      const dk=dayKey(r.t), memo=p.days[dk]||{};
+      const row=[...pre,r.t,dk,r.day??'',r.kind||'이전버전',r.tag||'',r.prep?1:0,r.repeatId||'',r.cam,r.mmpp?r.mmpp.toFixed(5):'',r.level??'',r.cond.yaw,r.cond.pitch,r.cond.roll,r.cond.size,r.cond.light,r.cond.lightMean??'',memo.sleep??'',memo.alcohol?1:'',memo.salty?1:'',memo.note||''];
+      for(const [,mk,sk] of sets) for(const k of keys){ const m=r[mk], sdv=r[sk]; row.push(m&&m[k]!=null?m[k].toFixed(4):'', sdv&&sdv[k]!=null?sdv[k].toFixed(4):''); }
+      row.push('','','','');
+      rows.push(row.map(csvq).join(','));
+    }
+    for(const t of p.truth){
+      const row=[...pre,t.t,dayKey(t.t),t.day??'','정답시험','','','','',t.mmpp?t.mmpp.toFixed(5):''];
+      while(row.length<head.length-4) row.push('');
+      row.push(...METHODS.map(M=>t.err&&t.err[M]!=null?t.err[M].toFixed(4):''));
+      rows.push(row.map(csvq).join(','));
+    }
   }
-  for(const t of store.truth){
-    const row=[t.t,dayKey(t.t),'','정답시험','','','','',t.mmpp?t.mmpp.toFixed(5):''];
-    while(row.length<head.length-4) row.push('');
-    row.push(...METHODS.map(M=>t.err&&t.err[M]!=null?t.err[M].toFixed(4):''));
-    rows.push(row.map(csvq).join(','));
-  }
-  const blob=new Blob(['﻿'+rows.join('\n')],{type:'text/csv'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`얼굴수평계_${today()}.csv`; a.click();
+  return '﻿'+rows.join('\n');
+}
+function download(text, name){
+  const blob=new Blob([text],{type:'text/csv'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href),2000);
-};
+}
+$('btnCsv').onclick=()=>download(csvFor([store]),`얼굴수평계_${store.name}_${today()}.csv`);
+$('btnCsvAll').onclick=()=>download(csvFor(Object.values(db.profiles)),`얼굴수평계_모든사람_${today()}.csv`);
 
 // ---------- 정답 시험 ----------
 function warpChin(src, chin, radius, shiftPx){
@@ -1145,8 +1307,8 @@ function analyzeImage(cv){
   const res=imgLandmarker.detect(cv); if(!res.faceLandmarks||!res.faceLandmarks.length) return null;
   const W=cv.width,H=cv.height, L=res.faceLandmarks[0], P=L.map(p=>({x:p.x*W,y:p.y*H}));
   const d=res.facialTransformationMatrixes&&res.facialTransformationMatrixes[0]?res.facialTransformationMatrixes[0].data:null;
-  const roll=d?poseFromMatrix(d,store.layout||'col+').rollRad:eyeLineAngle(P);
-  return {P, A:computeMetrics(P,roll), B:computeMetricsB(P), C:computeMetricsC(P), D:computeMetricsD(L,W,H,roll), mmpp:mmPerPx(P)};
+  const roll=d?poseFromMatrix(d,db.layout||'col+').rollRad:eyeLineAngle(P);
+  return {P, A:computeMetrics(P,roll), B:computeMetricsB(P), C:computeMetricsC(P), D:computeMetricsD(L,W,H,roll,store.front), mmpp:mmPerPx(P)};
 }
 async function runTruth(){
   const box=$('truthBox'); box.innerHTML=''; const note=document.createElement('div'); note.className='note'; box.appendChild(note);
