@@ -765,7 +765,7 @@ function stepState(st){
   const t=today();
   if(st.k==='front') return {done:!!store.front, text:'개인 정면 등록 (처음 한 번, 3번 반복)', hint:'편하게 앉아 렌즈를 3초 바라보기 × 3번. 사이마다 고개를 한 번 돌렸다 돌아와요'};
   if(st.k==='fcheck') return {done:store.frontChecks.some(c=>dayKey(c.t)===t), text:'정면 확인 (기준은 안 바뀌어요)', hint:'처음 등록한 정면이 오늘도 같은지 다시 재서 비교해요'};
-  if(st.k==='memo') return {done:!!store.days[t], text:'한 줄 메모', hint:'잠·술·짠 음식, 불편했던 점'};
+  if(st.k==='memo') return {done:!!store.days[t], text:'한 줄 메모 (선택)', hint:'안 써도 돼요. 붓기에 영향 줄 만한 일이 있던 날만'};
   if(st.k==='truth') return {done:store.truth.some(x=>dayKey(x.t)===t), text:'정답 시험', hint:'측정이 끝나면 자동으로 해요'};
   if(st.k==='manual') return {done:!!store.manual[t], text:'다른 폰으로 측정', hint:st.text, manual:true};
   const n=todayCount(st.k, st.k==='cond'?st.tag:null), name=st.k==='cond'?'실험: '+st.tag:KIND_NAME[st.k];
@@ -1192,7 +1192,7 @@ function finish(s){
     level:(tilt.v!=null&&performance.now()-tilt.t<1500)?+tilt.v.toFixed(2):null, n:burst.length,
     cond:{yaw:+s.pose.yaw.toFixed(2),pitch:+s.pose.pitch.toFixed(2),roll:+s.pose.roll.toFixed(2),size:+s.size.toFixed(4),light:+s.light.ratio.toFixed(3),lightMean:Math.round(s.light.mean)},
     cam:$('camSel').value, img};
-  rec.person=store.name;
+  rec.person=store.name; if(store.front) rec.front={yaw:+store.front.yaw.toFixed(2),pitch:+store.front.pitch.toFixed(2),roll:+store.front.roll.toFixed(2),t:store.front.t};
   store.records.push(rec); save();
   setRing(1);
   renderAll();
@@ -1359,7 +1359,7 @@ function renderRef(){
 }
 function renderAll(){ renderPeople(); renderToday(); renderLatest(); renderSummary(); renderTrend(); renderHist(); renderRef(); }
 
-$('btnResetRef').onclick=()=>{ store.ref=null; store.front=null; store.frontChecks=[]; save(); renderAll(); };
+$('btnResetRef').onclick=()=>{ if(store.front){ store.frontHistory=store.frontHistory||[]; store.frontHistory.push({...store.front, checks:store.frontChecks, ended:new Date().toISOString()}); } store.ref=null; store.front=null; store.frontChecks=[]; save(); renderAll(); };
 $('btnClear').onclick=()=>{ $('clearConfirm').hidden=false; };
 $('btnClearNo').onclick=()=>{ $('clearConfirm').hidden=true; };
 $('btnClearYes').onclick=()=>{ db.profiles[db.cur]=normProfile({name:store.name,mode:store.mode,faceCm:store.faceCm,created:store.created}); store=db.profiles[db.cur]; lastNormalFrame=null; save(); $('clearConfirm').hidden=true; renderAll(); };
@@ -1422,9 +1422,11 @@ function csvFor(profiles){
   const rows=[head.join(',')];
   for(const p of profiles){
     const fr=p.front||{}, fu=frontUncertainty(p.front,p.frontChecks), n2=v=>v!=null?v.toFixed(2):'';
-    const pre=[p.name,p.mode==='guest'?'1회':'4주',n2(fr.yaw),n2(fr.pitch),n2(fr.roll),n2(fr.spreadYaw),n2(fr.spreadPitch),p.front?fu.deg.toFixed(2):''];
+    const pre0=[p.name,p.mode==='guest'?'1회':'4주',n2(fr.yaw),n2(fr.pitch),n2(fr.roll),n2(fr.spreadYaw),n2(fr.spreadPitch),p.front?fu.deg.toFixed(2):''];
+    const frontAt=t=>{ for(const h of (p.frontHistory||[])) if(t>=h.t&&t<h.ended) return h; return p.front&&t>=p.front.t?p.front:null; };
     for(const r of p.records){
       const dk=dayKey(r.t), memo=p.days[dk]||{};
+      const F=frontAt(r.t)||r.front, pre=F?[p.name,p.mode==='guest'?'1회':'4주',n2(F.yaw),n2(F.pitch),n2(F.roll),n2(F.spreadYaw),n2(F.spreadPitch),F.tries?frontUncertainty(F,F.checks||(F===p.front?p.frontChecks:[])).deg.toFixed(2):'']:pre0;
       const row=[...pre,r.t,dk,r.day??'',r.kind||'이전버전',r.tag||'',r.prep?1:0,r.repeatId||'',r.cam,r.mmpp?r.mmpp.toFixed(5):'',r.level??'',r.cond.yaw,r.cond.pitch,r.cond.roll,r.cond.size,r.cond.light,r.cond.lightMean??'',memo.sleep??'',memo.alcohol?1:'',memo.salty?1:'',memo.note||''];
       for(const [,mk,sk] of sets) for(const k of keys){ const m=r[mk], sdv=r[sk]; row.push(m&&m[k]!=null?m[k].toFixed(4):'', sdv&&sdv[k]!=null?sdv[k].toFixed(4):''); }
       for(const f of ['f06','f10']) for(const k of EF){ const v=r.eF&&r.eF[f]?r.eF[f][k]:null; row.push(v!=null?v.toFixed(4):''); }
@@ -1432,13 +1434,13 @@ function csvFor(profiles){
       rows.push(row.map(csvq).join(','));
     }
     for(const t of p.truth){
-      const row=[...pre,t.t,dayKey(t.t),t.day??'','정답시험','','','','',t.mmpp?t.mmpp.toFixed(5):''];
+      const pre=pre0; const row=[...pre,t.t,dayKey(t.t),t.day??'','정답시험','','','','',t.mmpp?t.mmpp.toFixed(5):''];
       while(row.length<head.length-TAIL) row.push('');
       row.push(...METHODS.map(M=>t.err&&t.err[M]!=null?t.err[M].toFixed(4):''), ...METHODS.map(M=>t.flip&&t.flip[M]!=null?t.flip[M].toFixed(4):''), ...METHODS.map(M=>t.gain&&t.gain[M]!=null?t.gain[M].toFixed(4):''));
       rows.push(row.map(csvq).join(','));
     }
     for(const c of (p.frontChecks||[])){
-      const row=[...pre,c.t,dayKey(c.t),c.day??'','정면확인','좌우차이 '+c.dYaw.toFixed(2)+' 위아래차이 '+c.dPitch.toFixed(2)];
+      const pre=pre0; const row=[...pre,c.t,dayKey(c.t),c.day??'','정면확인','좌우차이 '+c.dYaw.toFixed(2)+' 위아래차이 '+c.dPitch.toFixed(2)];
       while(row.length<head.length) row.push('');
       rows.push(row.map(csvq).join(','));
     }
