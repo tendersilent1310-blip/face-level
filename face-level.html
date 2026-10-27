@@ -7,11 +7,11 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <style>
-/* 수평계 콘셉트: 촬영 조건을 '기포 수평계'처럼 맞추고, 다 맞으면 자동으로 찍는다 */
+/* 실험실 콘셉트: 오늘 할 일을 위에서 순서대로 → 카메라가 알아서 찍고 → 아래에 결과가 쌓인다 */
 :root{
   --bg:#EEF2F0; --panel:#FFFFFF; --ink:#16201D; --muted:#5B6964; --line:#D3DBD7;
   --ok:#0E8A69; --ok-soft:#D7EFE7; --warn:#B9761A; --warn-soft:#F5E8D2; --bad:#BC3F37; --bad-soft:#F6DEDB;
-  --accent:#1D5C7A; --tube:#E4EBE8;
+  --accent:#1D5C7A; --accent-soft:#DCE9F0; --tube:#E4EBE8;
   --font-body:"IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
   --font-num:"IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
   color-scheme:light;
@@ -19,9 +19,10 @@
 @media (prefers-color-scheme:dark){:root{
   --bg:#0F1513; --panel:#18201D; --ink:#E6EEEA; --muted:#93A39C; --line:#2C3833;
   --ok:#3CC79C; --ok-soft:#173A2F; --warn:#E3A64A; --warn-soft:#3A2D17; --bad:#EE7A70; --bad-soft:#3E1F1C;
-  --accent:#6FB3D3; --tube:#222C28; color-scheme:dark;
+  --accent:#6FB3D3; --accent-soft:#1B3240; --tube:#222C28; color-scheme:dark;
 }}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 html,body{margin:0}
 body{background:var(--bg);color:var(--ink);font:15px/1.55 var(--font-body);
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
@@ -34,21 +35,45 @@ h2{font-size:15px;margin:0;font-weight:600}
 .grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:20px;align-items:start}
 @media (max-width:860px){.grid{grid-template-columns:minmax(0,1fr)}}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;display:grid;gap:14px;min-width:0}
+.stagewrap{border-radius:14px;transition:padding .2s,background .2s}
+.stagewrap.lit{background:#fff;padding:22px;box-shadow:0 0 0 1px var(--line)}
 .stage{position:relative;width:100%;background:#000;border-radius:10px;overflow:hidden;aspect-ratio:4/3}
 .stage video,.stage canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
 .stage.mirror video,.stage.mirror canvas{transform:scaleX(-1)}
-.stage .msg{position:absolute;left:0;right:0;bottom:0;padding:10px 14px;background:linear-gradient(transparent,rgba(0,0,0,.75));color:#fff;font-weight:600;font-size:16px;text-align:center}
+.stage .msg{position:absolute;left:0;right:0;bottom:0;padding:14px 16px;background:linear-gradient(transparent,rgba(0,0,0,.78));color:#fff;font-weight:600;font-size:18px;text-align:center}
+.stage .step-badge{position:absolute;left:12px;top:12px;background:rgba(0,0,0,.6);color:#fff;font-size:13px;font-weight:600;padding:5px 10px;border-radius:999px}
 .stage .start{position:absolute;inset:0;display:grid;place-items:center;align-content:center;gap:10px;color:#fff;text-align:center;padding:20px}
 .ring{position:absolute;top:12px;right:12px;width:54px;height:54px}
 .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 button,select,input{font:inherit;color:inherit}
 button{border:1px solid var(--line);background:var(--panel);border-radius:9px;padding:8px 13px;cursor:pointer;font-weight:500}
 button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button.big{font-size:17px;font-weight:600;padding:13px 18px;width:100%}
 button.danger{color:var(--bad)}
 button:disabled{opacity:.5;cursor:default}
 button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-select,input[type=number]{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:7px 9px}
+select,input[type=number],input[type=text]{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:7px 9px}
 input[type=number]{width:84px}
+input[type=text]{min-width:0;flex:1 1 220px}
+/* 오늘의 실험 */
+.today{border-color:var(--accent);background:linear-gradient(var(--accent-soft),var(--panel) 120px)}
+.dayhead{display:flex;gap:14px;align-items:center}
+.daynum{font-family:var(--font-num);font-size:30px;font-weight:600;line-height:1;color:var(--accent);min-width:3.2em}
+.daynum small{display:block;font-size:12px;font-family:var(--font-body);color:var(--muted);font-weight:500;margin-top:4px}
+.steps{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.steps li{display:grid;grid-template-columns:26px minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px 11px;border-radius:10px;background:var(--tube)}
+.steps li .ck{width:22px;height:22px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;font-size:13px;font-weight:700;color:#fff}
+.steps li.done .ck{background:var(--ok);border-color:var(--ok)}
+.steps li.now{box-shadow:inset 0 0 0 2px var(--accent)}
+.steps li .t{font-weight:600;font-size:14px}
+.steps li .h{color:var(--muted);font-size:12.5px}
+.steps li .c{font-family:var(--font-num);font-size:13px;color:var(--muted)}
+.memo{display:grid;gap:8px;padding:12px;border-radius:10px;border:1px dashed var(--line)}
+.dots{display:grid;grid-template-columns:repeat(14,minmax(0,1fr));gap:5px}
+.dots span{aspect-ratio:1;border-radius:50%;background:var(--tube);border:1px solid var(--line)}
+.dots span.on{background:var(--ok);border-color:var(--ok)}
+.dots span.cur{box-shadow:0 0 0 2px var(--accent)}
+/* 촬영 조건 */
 .checks{display:grid;gap:8px}
 .check{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:10px;align-items:center;padding:7px 10px;border-radius:9px;background:var(--tube)}
 .check .dot{width:14px;height:14px;border-radius:50%;background:var(--muted);justify-self:center}
@@ -59,6 +84,7 @@ input[type=number]{width:84px}
 .level{position:relative;height:12px;border-radius:6px;background:var(--panel);border:1px solid var(--line);margin-top:4px;overflow:hidden}
 .level .zone{position:absolute;top:0;bottom:0;background:var(--ok-soft)}
 .level .bubble{position:absolute;top:1px;width:10px;height:8px;border-radius:5px;background:var(--accent);transform:translateX(-50%);transition:left .08s linear}
+/* 결과 */
 .metrics{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
 .metric{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:2px}
 .metric .k{font-size:12.5px;color:var(--muted)}
@@ -71,10 +97,13 @@ table{border-collapse:collapse;width:100%;font-size:13px}
 th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
 th:first-child,td:first-child{text-align:left}
 td{font-family:var(--font-num);font-variant-numeric:tabular-nums}
+td.lbl{font-family:var(--font-body)}
+td.pass{color:var(--ok);font-weight:600} td.fail{color:var(--bad);font-weight:600}
 th{font-weight:600;color:var(--muted);font-size:12px}
+caption{caption-side:bottom;text-align:left;padding-top:8px}
 .hist{display:grid;gap:8px}
-.rec{display:grid;grid-template-columns:64px minmax(0,1fr) auto;gap:12px;align-items:center;padding:8px;border:1px solid var(--line);border-radius:10px}
-.rec img{width:64px;height:64px;object-fit:cover;border-radius:7px;background:var(--tube)}
+.rec{display:grid;grid-template-columns:56px minmax(0,1fr) auto;gap:12px;align-items:center;padding:8px;border:1px solid var(--line);border-radius:10px}
+.rec img{width:56px;height:56px;object-fit:cover;border-radius:7px;background:var(--tube)}
 .rec .t{font-size:13px;font-weight:600}
 .rec .s{font-size:12px;color:var(--muted);font-family:var(--font-num)}
 .note{font-size:12.5px;color:var(--muted);line-height:1.6}
@@ -82,36 +111,63 @@ th{font-weight:600;color:var(--muted);font-size:12px}
 details summary{cursor:pointer;font-weight:600;font-size:14px}
 .guide{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--tube)}
 .guide ol{margin:8px 0;padding-left:20px;display:grid;gap:6px;font-size:13.5px}
-.stage .msg{font-size:18px;padding:14px 16px}
+.kv{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 12px;font-size:13px}
 svg text{fill:var(--muted);font-family:var(--font-num);font-size:11px}
-@media (prefers-reduced-motion:reduce){.level .bubble{transition:none}}
+@media (prefers-reduced-motion:reduce){.level .bubble{transition:none}.stagewrap{transition:none}}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
     <div>
-      <h1>얼굴 수평계</h1>
-      <div class="sub">조건이 매번 같아질 때만 자동으로 찍고, 비대칭을 숫자로 기록해요.</div>
+      <h1>얼굴 수평계 <span class="sub">실험실</span></h1>
+      <div class="sub">4주 동안 매일 측정해서, 폰 카메라가 내 얼굴을 얼마나 정확하게 재는지 증명해요.</div>
     </div>
     <div class="sub" id="engineState">준비 전</div>
   </header>
 
+  <section class="panel today" aria-label="오늘의 실험">
+    <div class="dayhead">
+      <div class="daynum" id="dayNum">1일<small id="dayWeek">1주차</small></div>
+      <div>
+        <h2 id="weekName">기본 저울 검사</h2>
+        <div class="note" id="weekGoal"></div>
+      </div>
+    </div>
+    <ol class="steps" id="steps"></ol>
+    <button class="primary big" id="btnGo">오늘 측정 시작</button>
+    <div class="memo" id="memoBox">
+      <div class="row" style="justify-content:space-between"><b>한 줄 메모</b><span class="sub" id="memoState"></span></div>
+      <div class="row">
+        <label class="sub" for="mSleep">어젯밤 잠</label>
+        <input type="number" id="mSleep" min="0" max="16" step="0.5" placeholder="시간">
+        <label class="sub"><input type="checkbox" id="mAlc"> 어제 술</label>
+        <label class="sub"><input type="checkbox" id="mSalt"> 어제 짠 음식·야식</label>
+      </div>
+      <div class="row">
+        <input type="text" id="mNote" placeholder="불편했던 점, 특이사항 (선택)">
+        <button id="btnMemo">메모 저장</button>
+      </div>
+    </div>
+  </section>
+
   <div class="grid">
     <section class="panel" aria-label="카메라">
-      <div class="stage" id="stage">
-        <video id="video" playsinline muted></video>
-        <canvas id="overlay"></canvas>
-        <svg class="ring" id="ring" viewBox="0 0 54 54" hidden>
-          <circle cx="27" cy="27" r="22" fill="none" stroke="rgba(255,255,255,.3)" stroke-width="5"/>
-          <circle id="ringArc" cx="27" cy="27" r="22" fill="none" stroke="#3CC79C" stroke-width="5" stroke-linecap="round" stroke-dasharray="138.2" stroke-dashoffset="138.2" transform="rotate(-90 27 27)"/>
-        </svg>
-        <div class="start" id="startCover">
-          <div style="font-size:17px;font-weight:600">카메라를 켜면 측정 준비를 시작해요</div>
-          <div style="font-size:13px;opacity:.8">사진은 이 기기 안에서만 분석하고, 어디로도 보내지 않아요.</div>
-          <button class="primary" id="btnStart">카메라 켜기</button>
+      <div class="stagewrap" id="stagewrap">
+        <div class="stage" id="stage">
+          <video id="video" playsinline muted></video>
+          <canvas id="overlay"></canvas>
+          <div class="step-badge" id="stepBadge" hidden></div>
+          <svg class="ring" id="ring" viewBox="0 0 54 54" hidden>
+            <circle cx="27" cy="27" r="22" fill="none" stroke="rgba(255,255,255,.3)" stroke-width="5"/>
+            <circle id="ringArc" cx="27" cy="27" r="22" fill="none" stroke="#3CC79C" stroke-width="5" stroke-linecap="round" stroke-dasharray="138.2" stroke-dashoffset="138.2" transform="rotate(-90 27 27)"/>
+          </svg>
+          <div class="start" id="startCover">
+            <div style="font-size:17px;font-weight:600">위의 "오늘 측정 시작"을 누르면 카메라가 켜져요</div>
+            <div style="font-size:13px;opacity:.8">사진은 이 기기 안에서만 분석하고, 어디로도 보내지 않아요.</div>
+          </div>
+          <div class="msg" id="msg" hidden></div>
         </div>
-        <div class="msg" id="msg" hidden></div>
       </div>
       <div class="row">
         <label class="sub" for="camSel">카메라</label>
@@ -119,21 +175,18 @@ svg text{fill:var(--muted);font-family:var(--font-num);font-size:11px}
           <option value="user">앞면(셀카)</option>
           <option value="environment">뒷면</option>
         </select>
-        <label class="sub" for="burstN">연속 프레임</label>
-        <select id="burstN"><option>10</option><option selected>20</option><option>30</option></select>
         <label class="sub"><input type="checkbox" id="voice" checked> 음성 안내</label>
-        <label class="sub"><input type="checkbox" id="repeatMode"> 반복 테스트</label>
-        <select id="repeatN" aria-label="반복 횟수"><option>5</option><option selected>10</option></select>
+        <label class="sub"><input type="checkbox" id="ringOn" checked> 화면 조명</label>
       </div>
-      <details class="guide" id="guide" open>
-        <summary>쉽게 맞추는 요령 (처음 한 번)</summary>
+      <details class="guide" id="guide">
+        <summary>쉽게 맞추는 요령</summary>
         <ol>
           <li><b>폰 세우기:</b> 거치대나 책·컵에 기대 세워요. 손으로 들면 매번 높이가 달라져요.</li>
-          <li><b>거리 재기:</b> 의자에 등을 붙이고 앉아 <b>팔을 쭉 뻗었을 때 손끝이 폰에 닿는 거리</b>(약 60cm)에 두세요. 내 팔이 자라는 셈이라 매일 똑같아요. 폰 자리를 테이프로 표시해 두면 더 쉬워요.</li>
+          <li><b>거리:</b> 의자에 등을 붙이고 앉아 <b>팔을 쭉 뻗어 손끝이 폰에 닿는 거리</b>(약 60cm). 폰 자리를 테이프로 표시해 두면 매일 똑같아요.</li>
           <li><b>높이:</b> 카메라가 눈높이쯤 오게 해요.</li>
-          <li><b>소리 따라 하기:</b> 화면이 멀면 음성 안내를 따라 하세요. 코에서 나온 <b style="color:var(--bad)">빨간 점</b>을 <b style="color:var(--ok)">초록 원</b>에 넣으면 정면이에요.</li>
+          <li><b>소리 따라 하기:</b> 코에서 나온 <b style="color:var(--bad)">빨간 점</b>을 <b style="color:var(--ok)">초록 원</b>에 넣으면 돼요. 실험 측정 때는 초록 원이 옆으로 옮겨가요.</li>
+          <li><b>조명:</b> 따로 맞추지 않아도 돼요. 앱이 밝기만 기록해요. 셀카 모드에서는 화면 테두리가 하얗게 빛나서 조명 역할을 해요(폰 밝기를 올리면 더 좋아요).</li>
         </ol>
-        <div class="note">첫 측정 자세가 <b>기준 자세</b>로 저장되고, 다음부터는 앱이 "앞으로/뒤로", "턱을 드세요"처럼 기준까지 안내해요.</div>
       </details>
     </section>
 
@@ -143,43 +196,46 @@ svg text{fill:var(--muted);font-family:var(--font-num);font-size:11px}
         <span class="tag" id="refTag">기준 자세 없음</span>
       </div>
       <div class="checks" id="checks"></div>
-      <div class="row">
-        <button id="btnResetRef">기준 자세 다시 정하기</button>
-      </div>
+      <div class="note">초록불이 다 켜지면 자동으로 20장을 찍어 한 번의 측정으로 저장해요. 조명은 기록만 하고 막지 않아요.</div>
     </section>
   </div>
+
+  <section class="panel" aria-label="실험 현황">
+    <div class="row" style="justify-content:space-between">
+      <h2>실험 현황</h2>
+      <span class="sub" id="progText"></span>
+    </div>
+    <div class="dots" id="dots" aria-hidden="true"></div>
+    <div id="sumBox"></div>
+  </section>
 
   <section class="panel" aria-label="최근 측정">
     <div class="row" style="justify-content:space-between">
       <h2>최근 측정</h2>
-      <span class="sub" id="lastWhen">아직 없음</span>
+      <div class="row">
+        <label class="sub" for="showM">계산 방식</label>
+        <select id="showM">
+          <option value="D">D 3D 보정</option><option value="A">A 미간선</option><option value="B">B 수직선</option><option value="C">C 거울 겹치기</option>
+        </select>
+      </div>
     </div>
+    <span class="sub" id="lastWhen">아직 없음</span>
     <div class="metrics" id="metrics"></div>
-    <div class="note" id="dirNote">
-      값이 0%에 가까울수록 좌우가 같아요. 모든 값은 <b>얼굴 너비 대비 %</b>예요. 방향은 <b>내 기준</b> 왼쪽/오른쪽이에요.
-    </div>
-    <div class="row">
-      <label class="sub" for="faceCm">내 얼굴 너비(cm, 선택)</label>
-      <input type="number" id="faceCm" min="10" max="20" step="0.1" placeholder="예: 14">
-      <span class="note">줄자로 잰 광대 끝~끝 너비를 넣으면 mm로도 보여줘요.</span>
-    </div>
+    <div id="methodBox"></div>
+    <div class="note">0에 가까울수록 좌우가 같아요. 검은 눈동자(홍채, 약 11.7mm)를 자로 써서 mm로 보여줘요. 방향은 <b>내 기준</b> 왼쪽/오른쪽이에요. 색 표시는 일반인이 사진에서 알아채기 시작한다는 크기(눈 2mm, 입·턱끝 3mm 등, 작은 연구 기준)와 비교한 참고값이에요.</div>
   </section>
 
-  <section class="panel" aria-label="일관성">
+  <section class="panel" aria-label="정답 시험">
     <div class="row" style="justify-content:space-between">
-      <h2>측정 일관성</h2>
-      <select id="consScope" aria-label="범위">
-        <option value="last">최근 반복 테스트</option>
-        <option value="today">오늘 측정 전체</option>
-        <option value="all">전체 기록</option>
-      </select>
+      <h2>정답 시험</h2>
+      <button id="btnTruth" disabled>방금 사진으로 다시 시험</button>
     </div>
-    <div class="note">같은 얼굴을 여러 번 쟀을 때 숫자가 얼마나 흔들리는지 보여줘요. 흔들림(표준편차)이 작을수록 측정을 믿을 수 있어요. 이 흔들림보다 큰 변화만 '진짜 변화'로 볼 수 있어요.</div>
-    <div class="tablewrap"><table id="consTable"></table></div>
+    <div class="note">측정한 사진에서 컴퓨터로 <b>턱끝만 정확히 1·2·3mm</b> 옮긴 가짜 사진을 만들어, 앱이 그만큼을 맞히는지 확인해요. 실험 단계에 있으면 자동으로 해요.</div>
+    <div id="truthBox"></div>
   </section>
 
   <section class="panel" aria-label="추이">
-    <h2>종합 지수 추이</h2>
+    <h2>날짜별 비대칭 (정상 측정 평균)</h2>
     <div id="trend"></div>
   </section>
 
@@ -191,8 +247,9 @@ svg text{fill:var(--muted);font-family:var(--font-num);font-size:11px}
         <button class="danger" id="btnClear">전체 삭제</button>
       </div>
     </div>
+    <div class="note">주말마다 CSV로 저장해서 Claude에게 보내 주세요. 기록은 이 브라우저에만 있어요.</div>
     <div id="clearConfirm" hidden class="confirm">
-      <span>모든 기록과 기준 자세를 지울까요? 되돌릴 수 없어요.</span>
+      <span>모든 기록, 메모, 기준 자세를 지울까요? 되돌릴 수 없어요.</span>
       <button class="danger" id="btnClearYes">지우기</button>
       <button id="btnClearNo">취소</button>
     </div>
@@ -200,13 +257,27 @@ svg text{fill:var(--muted);font-family:var(--font-num);font-size:11px}
   </section>
 
   <details class="panel">
+    <summary>고급 설정</summary>
+    <div class="row">
+      <label class="sub" for="burstN">한 번 측정할 때 찍는 장수</label>
+      <select id="burstN"><option>10</option><option selected>20</option><option>30</option></select>
+      <button id="btnResetRef">기준 자세 다시 정하기</button>
+    </div>
+    <div class="row">
+      <label class="sub" for="faceCm">내 얼굴 너비(cm)</label>
+      <input type="number" id="faceCm" min="10" max="20" step="0.1" placeholder="예: 14">
+      <span class="note">홍채가 안 잡힐 때만 mm 계산에 쓰여요.</span>
+    </div>
+  </details>
+
+  <details class="panel">
     <summary>측정 방식과 한계</summary>
     <div class="note">
-      · 얼굴에 점 478개를 찍는 MediaPipe 얼굴 인식 모델을 써요. 기울기는 3D 머리 자세로 보정한 뒤 계산해요.<br>
-      · 눈·눈썹·입꼬리: 좌우 높이 차이 ÷ 얼굴 너비. 턱끝·코끝: 미간 중심선에서 벗어난 거리 ÷ 얼굴 너비. 좌우 폭: (오른쪽−왼쪽) ÷ (합).<br>
-      · 턱/광대 비율과 가로/세로 비율은 갸름함 참고용이에요. 거리·렌즈에 따라 달라지니 같은 기준 자세끼리만 비교하세요.<br>
-      · 사진 기반 추정치예요. 의료기기가 아니며 질병 여부를 판단하지 않아요. 통증이나 급한 변화가 있으면 병원 확인이 먼저예요.<br>
-      · 기록은 이 브라우저에만 저장돼요. 브라우저 데이터를 지우면 사라지니 가끔 CSV로 저장해 두세요.
+      · 얼굴에 점 478개를 찍는 MediaPipe 얼굴 인식 모델을 써요.<br>
+      · 눈·눈썹·입꼬리: 좌우 높이 차이. 턱끝·코끝: 세로 중심선에서 벗어난 거리. 좌우 폭: (오른쪽−왼쪽) ÷ (합). mm 환산은 홍채 지름 11.7mm 가정.<br>
+      · 계산 방식 네 가지: A 미간을 지나는 선(기울기 보정), B 화면 세로선과 좌우 짝 점 220쌍의 가운데, C 얼굴을 좌우 반전해 가장 잘 겹치는 축(거울 겹치기), D 3D 점으로 고개 좌우·위아래 돌림을 되돌린 뒤 미간선. 중심선에 턱끝을 넣지 않는 건, 턱이 틀어지면 기준도 같이 틀어지기 때문이에요.<br>
+      · 흑백 보정: 흑백으로 바꾸고 명암을 칸마다 고르게 펴서(CLAHE) 그림자 영향을 줄여 봐요. 얼굴 인식 AI는 컬러 사진으로 배워서 오히려 나빠질 수도 있어서, 실험으로 비교해요.<br>
+      · 사진 기반 추정치예요. 의료기기가 아니며 질병 여부를 판단하지 않아요. 통증이나 급한 변화가 있으면 병원 확인이 먼저예요.
     </div>
   </details>
 </div>
@@ -242,7 +313,7 @@ function poseFromMatrix(d, layout){
 }
 // 3D 점으로 얼굴이 향하는 방향(화면 좌표 기준) 계산. 레이저 포인터 가이드와 정면 판정에 사용
 // L: 정규화 랜드마크(x,y,z), W/H: 영상 크기. 반환 yaw(+: 화면 오른쪽을 향함), pitch(+: 아래를 향함), 단위 도
-function faceDirection(L, W, H){
+function faceVector(L, W, H){
   const v=i=>({x:L[i].x*W, y:L[i].y*H, z:(L[i].z||0)*W});
   const sub=(a,b)=>({x:a.x-b.x,y:a.y-b.y,z:a.z-b.z});
   const cross=(a,b)=>({x:a.y*b.z-a.z*b.y, y:a.z*b.x-a.x*b.z, z:a.x*b.y-a.y*b.x});
@@ -251,9 +322,33 @@ function faceDirection(L, W, H){
   const n1=norm(cross(sub(v(454),v(234)), sub(v(152),v(10))));
   const n2=norm(cross(sub(v(263),v(33)), sub(mid(v(61),v(291)),v(168))));
   let f=norm({x:n1.x+n2.x,y:n1.y+n2.y,z:n1.z+n2.z});
-  f={x:-f.x,y:-f.y,z:-f.z};              // 카메라 쪽(작은 z)을 향하게
-  const deg=180/Math.PI;
+  return {x:-f.x,y:-f.y,z:-f.z};          // 카메라 쪽(작은 z)을 향하게
+}
+function faceDirection(L, W, H){
+  const f=faceVector(L,W,H), deg=180/Math.PI;
   return {yaw:Math.atan2(f.x,-f.z)*deg, pitch:Math.atan2(f.y,-f.z)*deg};
+}
+// 3D 점을 돌려서 '정면에서 본 얼굴'로 되돌린다 (고개 좌우·위아래 돌림 보정)
+// 표준 얼굴에서 이 계산법이 내놓는 기본 끄덕임 각도(점 고르는 방식 때문에 생기는 고정 차이)
+const PITCH0=Math.atan(0.0686);
+function frontalize(L, W, H){
+  const f=faceVector(L,W,H), c={x:L[168].x*W, y:L[168].y*H, z:(L[168].z||0)*W};
+  // 1) 끄덕임 되돌리기 (X축 회전): 기본 각도만 남기고 되돌린다
+  const pit=Math.atan2(f.y,-f.z)-PITCH0, cb=Math.cos(pit), sb=Math.sin(pit);
+  const fy1=f.y*cb+f.z*sb, fz1=-f.y*sb+f.z*cb;
+  // 2) 좌우 돌림 되돌리기 (Y축 회전)
+  const yaw=Math.atan2(f.x,-fz1), ca=Math.cos(yaw), sa=Math.sin(yaw);
+  return L.map(p=>{
+    const x=p.x*W-c.x, y=p.y*H-c.y, z=(p.z||0)*W-c.z;
+    const y1=y*cb+z*sb, z1=-y*sb+z*cb;
+    const x2=x*ca+z1*sa;
+    return {x:c.x+x2, y:c.y+y1};
+  });
+}
+// 기준선 D: 3D로 고개 돌림을 되돌린 뒤 A와 같은 방식(미간선)으로 계산
+function computeMetricsD(L, W, H, rollRad){
+  const F=frontalize(L,W,H), c=F[IDX.nasion], Q=transform(F,rollRad,c);
+  return frameMetrics(Q, Q[IDX.nasion].x);
 }
 // 눈꼬리 선 각도(라디안, 화면 기준). 행렬 형식 판별용
 function eyeLineAngle(P){
@@ -262,28 +357,75 @@ function eyeLineAngle(P){
   return ang;
 }
 
-// P: 픽셀 좌표 랜드마크 배열, rollRad: 보정할 기울기. 모든 비대칭 값은 얼굴 너비 대비 %
-function computeMetrics(P, rollRad){
-  const c=P[IDX.nasion];
-  const Q=i=>rot(P[i], c, -rollRad);
-  const G=ids=>centroid(ids.map(Q));
-  const fw=dist(Q(IDX.rFace),Q(IDX.lFace));
-  const n=Q(IDX.nasion);
+// 좌우 짝 점(내 오른쪽, 내 왼쪽)과 중앙선 위 점. MediaPipe 표준 얼굴 모델을 좌우 반전해 정확히 계산한 목록
+const PAIRS=[[3,248],[7,249],[20,250],[21,251],[22,252],[23,253],[24,254],[25,255],[26,256],[27,257],[28,258],[29,259],[30,260],[31,261],[32,262],[33,263],[34,264],[35,265],[36,266],[37,267],[38,268],[39,269],[40,270],[41,271],[42,272],[43,273],[44,274],[45,275],[46,276],[47,277],[48,278],[49,279],[50,280],[51,281],[52,282],[53,283],[54,284],[55,285],[56,286],[57,287],[58,288],[59,289],[60,290],[61,291],[62,292],[63,293],[64,294],[65,295],[66,296],[67,297],[68,298],[69,299],[70,300],[71,301],[72,302],[73,303],[74,304],[75,305],[76,306],[77,307],[78,308],[79,309],[80,310],[81,311],[82,312],[83,313],[84,314],[85,315],[86,316],[87,317],[88,318],[89,319],[90,320],[91,321],[92,322],[93,323],[95,324],[96,325],[97,326],[98,327],[99,328],[100,329],[101,330],[102,331],[103,332],[104,333],[105,334],[106,335],[107,336],[108,337],[109,338],[110,339],[111,340],[112,341],[113,342],[114,343],[115,344],[116,345],[117,346],[118,347],[119,348],[120,349],[121,350],[122,351],[123,352],[124,353],[125,354],[126,355],[127,356],[128,357],[129,358],[130,359],[131,360],[132,361],[133,362],[134,363],[135,364],[136,365],[137,366],[138,367],[139,368],[140,369],[141,370],[142,371],[143,372],[144,373],[145,374],[146,375],[147,376],[148,377],[149,378],[150,379],[153,380],[154,381],[155,382],[156,383],[157,384],[158,385],[159,386],[160,387],[161,388],[162,389],[163,390],[165,391],[166,392],[167,393],[169,394],[170,395],[171,396],[172,397],[173,398],[174,399],[176,400],[177,401],[178,402],[179,403],[180,404],[181,405],[182,406],[183,407],[184,408],[185,409],[186,410],[187,411],[188,412],[189,413],[190,414],[191,415],[192,416],[193,417],[194,418],[196,419],[198,420],[201,421],[202,422],[203,423],[204,424],[205,425],[206,426],[207,427],[208,428],[209,429],[210,430],[211,431],[212,432],[213,433],[214,434],[215,435],[216,436],[217,437],[218,438],[219,439],[220,440],[221,441],[222,442],[223,443],[224,444],[225,445],[226,446],[227,447],[228,448],[229,449],[230,450],[231,451],[232,452],[233,453],[234,454],[235,455],[236,456],[237,457],[238,458],[239,459],[240,460],[241,461],[242,462],[243,463],[244,464],[245,465],[246,466],[247,467]];
+const MIDS=[0,1,2,4,5,6,8,9,10,11,12,13,14,15,16,17,18,19,94,151,152,164,168,175,195,197,199,200];
+const IRIS_MM=11.7;   // 사람 홍채 지름은 거의 일정 → 사진 속 자로 사용
+
+// Q: 기울기를 바로 세운 점들, midX: 세로 중심선(Y축)의 x 위치. 비대칭 값은 얼굴 너비 대비 %
+function frameMetrics(Q, midX){
+  const G=ids=>centroid(ids.map(i=>Q[i]));
+  const fw=dist(Q[IDX.rFace],Q[IDX.lFace]);
   const eR=G(IDX.rEye), eL=G(IDX.lEye), bR=G(IDX.rBrow), bL=G(IDX.lBrow);
-  const R=n.x-Q(IDX.rFace).x, L=Q(IDX.lFace).x-n.x;
+  const R=midX-Q[IDX.rFace].x, L=Q[IDX.lFace].x-midX;
   const m={
     eye:   (eL.y-eR.y)/fw*100,                 // + : 오른쪽 눈이 더 높음
     brow:  (bL.y-bR.y)/fw*100,                 // + : 오른쪽 눈썹이 더 높음
-    mouth: (Q(IDX.lMouth).y-Q(IDX.rMouth).y)/fw*100, // + : 오른쪽 입꼬리가 더 높음
-    chin:  (Q(IDX.chin).x-n.x)/fw*100,         // + : 턱끝이 내 왼쪽으로
-    nose:  (Q(IDX.noseTip).x-n.x)/fw*100,      // + : 코끝이 내 왼쪽으로
+    mouth: (Q[IDX.lMouth].y-Q[IDX.rMouth].y)/fw*100, // + : 오른쪽 입꼬리가 더 높음
+    chin:  (Q[IDX.chin].x-midX)/fw*100,        // + : 턱끝이 내 왼쪽으로
+    nose:  (Q[IDX.noseTip].x-midX)/fw*100,     // + : 코끝이 내 왼쪽으로
     width: (R-L)/(R+L)*100,                    // + : 오른쪽 얼굴이 더 넓음
-    jaw:   dist(Q(IDX.rJaw),Q(IDX.lJaw))/fw,   // 턱/광대 너비 비율
-    wh:    fw/dist(Q(IDX.top),Q(IDX.chin)),    // 얼굴 가로/세로 비율
+    jaw:   dist(Q[IDX.rJaw],Q[IDX.lJaw])/fw,   // 턱/광대 너비 비율
+    wh:    fw/dist(Q[IDX.top],Q[IDX.chin]),    // 얼굴 가로/세로 비율
     fwPx:  fw
   };
   m.total=mean([m.eye,m.brow,m.mouth,m.chin,m.width].map(Math.abs));
   return m;
+}
+function transform(P, ang, c){ return P.map(p=>rot(p,c,-ang)); }
+function midlineX(Q){
+  const xs=PAIRS.map(([r,l])=>(Q[r].x+Q[l].x)/2).concat(MIDS.map(i=>Q[i].x));
+  return mean(xs);
+}
+// 기준선 A: 3D 머리 기울기로 바로 세우고, 미간을 지나는 세로선
+function computeMetrics(P, rollRad){
+  const c=P[IDX.nasion], Q=transform(P,rollRad,c);
+  return frameMetrics(Q, Q[IDX.nasion].x);
+}
+// 기준선 B: 화면 세로선(폰이 수평이면 = 중력 수직선) 그대로, 위치는 좌우 짝 점들의 가운데
+function computeMetricsB(P){ return frameMetrics(P, midlineX(P)); }
+// 기준선 C: 거울 겹치기. 얼굴을 좌우 반전해 원래 얼굴에 가장 잘 겹치는 축을 찾는다
+function mirrorFit(P){
+  const pts=PAIRS.flat().concat(MIDS), Gc=centroid(pts.map(i=>P[i]));
+  const cost=a=>{
+    const s=Math.sin(-a), k=Math.cos(-a);
+    const X=i=>Gc.x+(P[i].x-Gc.x)*k-(P[i].y-Gc.y)*s, Y=i=>Gc.y+(P[i].x-Gc.x)*s+(P[i].y-Gc.y)*k;
+    const mids=[], dy=[];
+    for(const [r,l] of PAIRS){ mids.push((X(r)+X(l))/2); dy.push((Y(l)-Y(r))/2); }
+    for(const i of MIDS) mids.push(X(i));
+    const c=mean(mids); let e=0; for(const v of mids) e+=(v-c)*(v-c); for(const v of dy) e+=v*v; return e;
+  };
+  let best=0, bc=cost(0);
+  for(let a=-15;a<=15;a+=0.5){ const r=a*Math.PI/180, v=cost(r); if(v<bc){bc=v;best=r;} }
+  let lo=best-0.5*Math.PI/180, hi=best+0.5*Math.PI/180;
+  for(let it=0;it<30;it++){ const m1=lo+(hi-lo)/3, m2=hi-(hi-lo)/3; if(cost(m1)<cost(m2)) hi=m2; else lo=m1; }
+  return {angle:(lo+hi)/2, center:Gc};
+}
+function computeMetricsC(P){
+  const f=mirrorFit(P), Q=transform(P,f.angle,f.center);
+  const m=frameMetrics(Q, midlineX(Q)); m.axisDeg=f.angle*180/Math.PI; return m;
+}
+// 홍채로 mm 환산: 1픽셀이 몇 mm인지
+function mmPerPx(P){
+  if(P.length<478) return null;
+  const d=mean([dist(P[469],P[471]),dist(P[470],P[472]),dist(P[474],P[476]),dist(P[475],P[477])]);
+  return d>2 ? IRIS_MM/d : null;
+}
+// 일반인이 알아채기 시작하는 대략의 크기(mm). 사진 실험 예비연구 값, 참고용
+const NOTICE_MM={eye:2, mouth:3, chin:3, nose:4, brow:3};
+function noticeLevel(k, mm){
+  const t=NOTICE_MM[k]; if(!t||mm==null) return null;
+  const a=Math.abs(mm); return a<t*0.66?['ok','거의 안 보임']:a<t?['warn','가까이 보면 보임']:['bad','눈에 띌 수 있음'];
 }
 const METRICS=[
   {k:'total',name:'종합 지수',unit:'%',dec:2,pos:'',neg:'',hint:'5개 비대칭 값의 평균(참고용)'},
@@ -303,6 +445,92 @@ function summarize(frames){
   return {m:out, sd:spread};
 }
 function verdict(sdPct){ if (sdPct<=0.3) return ['ok','안정']; if (sdPct<=0.7) return ['warn','보통']; return ['bad','흔들림 큼']; }
+
+// ---------- 실험 계획 (4주) ----------
+function dayKey(t){ const d=new Date(t); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+const W2=[['고개 좌우 2°','고개 좌우 4°','고개 좌우 6°'],['끄덕임 위','끄덕임 아래'],['더 가까이','더 멀리'],['측면 조명','옆으로 기울임'],['살짝 웃음','안경'],['다른 폰'],['저녁 시간']];
+const BASIC=[{k:'normal',n:3},{k:'repeat',n:10},{k:'clahe',n:3},{k:'truth'},{k:'memo'}];
+function planFor(day){
+  if(day<=7)  return {week:1, name:'기본 저울 검사', goal:'앱이 매번 같은 숫자를 내는지(흔들림)와, 일부러 옮긴 2mm를 맞히는지(정답) 봐요.', steps:BASIC};
+  if(day<=14){
+    const c=W2[day-8], steps=[{k:'normal',n:3}];
+    for(const t of c) steps.push(t==='다른 폰'?{k:'manual',text:'가족·친구 폰으로 같은 링크를 열어 정상 측정 3번 → 그 폰에서 CSV 저장해서 보내기'}:{k:'cond',tag:t,n:c.length>2?2:3});
+    steps.push({k:'memo'});
+    return {week:2, name:'방해꾼 시험', goal:'일부러 자세·거리·조명을 틀어서, 어떤 실수가 오차를 얼마나 키우는지 봐요.', steps};
+  }
+  if(day<=21) return {week:3, name:'개선 확인', goal:'고친 버전으로 1주차 검사를 다시 해서, 흔들림과 정답 오차가 줄었는지 봐요.', steps:BASIC};
+  if(day<=28) return {week:4, name:'내 얼굴 지도', goal:'정상 측정만 해서 내 얼굴의 비대칭 값과 오차 범위를 확정해요.', steps:[{k:'normal',n:3},{k:'memo'}]};
+  return {week:5, name:'계속 기록', goal:'실험 완료! 계속 기록하면 마사지 실험의 기준값이 돼요.', steps:[{k:'normal',n:3},{k:'memo'}]};
+}
+
+// ---------- 흑백 + 명암 보정 (CLAHE) ----------
+// gray: 밝기 값 배열(w*h). 작은 칸마다 밝기 분포를 고르게 펴되, 너무 세게 펴지 않도록 제한(clip)한다
+function clahe(gray, w, h, tiles, clip){
+  tiles=tiles||8; clip=clip||2.0;
+  const tx=tiles, ty=tiles, tw=Math.ceil(w/tx), th=Math.ceil(h/ty);
+  const luts=new Uint8Array(tx*ty*256), hist=new Uint32Array(256);
+  for(let j=0;j<ty;j++) for(let i=0;i<tx;i++){
+    hist.fill(0);
+    const x0=i*tw, y0=j*th, x1=Math.min(w,x0+tw), y1=Math.min(h,y0+th); let n=0;
+    for(let y=y0;y<y1;y++){ let k=y*w+x0; for(let x=x0;x<x1;x++,k++){ hist[gray[k]]++; n++; } }
+    const base=(j*tx+i)*256;
+    if(!n){ for(let v=0;v<256;v++) luts[base+v]=v; continue; }
+    const limit=Math.max(1,Math.floor(clip*n/256)); let excess=0;
+    for(let v=0;v<256;v++) if(hist[v]>limit){ excess+=hist[v]-limit; hist[v]=limit; }
+    const add=Math.floor(excess/256), rem=excess-add*256;
+    for(let v=0;v<256;v++) hist[v]+=add+(v<rem?1:0);
+    let cum=0; for(let v=0;v<256;v++){ cum+=hist[v]; luts[base+v]=Math.min(255,Math.round(cum*255/n)); }
+  }
+  const out=new Uint8ClampedArray(w*h);
+  for(let y=0;y<h;y++){
+    const gy=(y+0.5)/th-0.5; let j0=Math.floor(gy), fy=gy-j0, j1=j0+1;
+    if(j0<0){ j0=0; j1=0; fy=0; } if(j1>ty-1){ j1=ty-1; if(j0>ty-1) j0=ty-1; }
+    for(let x=0;x<w;x++){
+      const gx=(x+0.5)/tw-0.5; let i0=Math.floor(gx), fx=gx-i0, i1=i0+1;
+      if(i0<0){ i0=0; i1=0; fx=0; } if(i1>tx-1){ i1=tx-1; if(i0>tx-1) i0=tx-1; }
+      const v=gray[y*w+x];
+      const a=luts[(j0*tx+i0)*256+v], b=luts[(j0*tx+i1)*256+v], c=luts[(j1*tx+i0)*256+v], d=luts[(j1*tx+i1)*256+v];
+      out[y*w+x]=(a*(1-fx)+b*fx)*(1-fy)+(c*(1-fx)+d*fx)*fy;
+    }
+  }
+  return out;
+}
+
+// ---------- 실험 결과 요약 ----------
+const MK={A:'m',B:'mB',C:'mC',D:'mD'}, METHODS=['A','B','C','D'];
+const KEY4=['eye','mouth','chin','nose'];
+function recMM(r, M, k){ const m=r[MK[M]]; if(!m||!r.mmpp||m[k]==null) return null; return m[k]/100*m.fwPx*r.mmpp; }
+function groupBy(a, f){ const g={}; for(const x of a){ const k=f(x); (g[k]=g[k]||[]).push(x); } return g; }
+function expSummary(records, truth){
+  const R=records.filter(r=>r.kind&&r.mmpp&&r.mD);
+  const out={methods:{}};
+  const reps=groupBy(R.filter(r=>r.kind==='repeat'), r=>r.repeatId);
+  const days=groupBy(R.filter(r=>r.kind==='normal'), r=>dayKey(r.t));
+  for(const M of METHODS){
+    const rep=[]; for(const g of Object.values(reps)) if(g.length>=3) for(const k of KEY4) rep.push(sd(g.map(r=>recMM(r,M,k))));
+    let daily=null; const dm=Object.values(days);
+    if(dm.length>=3){ const v=[]; for(const k of KEY4) v.push(sd(dm.map(g=>mean(g.map(r=>recMM(r,M,k)))))); daily=mean(v); }
+    const te=(truth||[]).filter(t=>t.err&&t.err[M]!=null).map(t=>t.err[M]);
+    out.methods[M]={repeat:rep.length?mean(rep):null, daily, truth:te.length?mean(te):null};
+  }
+  out.n={repeatSets:Object.values(reps).filter(g=>g.length>=3).length, days:Object.keys(days).length, truth:(truth||[]).length};
+  let best=null, bs=Infinity;
+  for(const M of METHODS){ const v=[out.methods[M].repeat,out.methods[M].daily,out.methods[M].truth].filter(x=>x!=null); if(v.length){ const sc=mean(v); if(sc<bs){ bs=sc; best=M; } } }
+  out.best=best;
+  // 흑백 보정 비교: 같은 날 같은 종류끼리의 흔들림 (D 방식)
+  const within=kind=>{ const g=groupBy(R.filter(r=>r.kind===kind), r=>dayKey(r.t)), v=[]; for(const a of Object.values(g)) if(a.length>=2) for(const k of KEY4) v.push(sd(a.map(r=>recMM(r,'D',k)))); return v.length?mean(v):null; };
+  out.clahe={off:within('normal'), on:within('clahe')};
+  // 방해꾼 시험: 같은 날 정상 측정 평균과의 차이(mm, 4항목 평균)
+  const cond={};
+  for(const r of R) if(r.kind==='cond'){
+    const base=days[dayKey(r.t)]; if(!base) continue;
+    const row=cond[r.tag]=cond[r.tag]||{A:[],B:[],C:[],D:[]};
+    for(const M of METHODS) row[M].push(mean(KEY4.map(k=>Math.abs(recMM(r,M,k)-mean(base.map(b=>recMM(b,M,k)))))));
+  }
+  out.cond={}; for(const [t,v] of Object.entries(cond)){ out.cond[t]={}; for(const M of METHODS) out.cond[t][M]=v[M].length?mean(v[M]):null; }
+  return out;
+}
+
 // CORE-END
 </script>
 
@@ -314,17 +542,28 @@ const KEY='face-level-v1';
 const $=id=>document.getElementById(id);
 
 // ---------- 저장 ----------
-function load(){ try{ const s=JSON.parse(localStorage.getItem(KEY)||'null'); if(s&&Array.isArray(s.records)){ if(s.ref&&s.ref.v!==2) s.ref=null; return s; } }catch(e){} return {records:[],ref:null,layout:null,faceCm:null}; }
+function load(){
+  let s=null;
+  try{ s=JSON.parse(localStorage.getItem(KEY)||'null'); }catch(e){}
+  if(!s||!Array.isArray(s.records)) s={records:[],ref:null,layout:null,faceCm:null};
+  if(s.ref&&s.ref.v!==2) s.ref=null;
+  s.days=s.days||{}; s.truth=s.truth||[]; s.manual=s.manual||{}; s.showM=s.showM||'D';
+  return s;
+}
 let store=load();
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(store)); }catch(e){ setMsg('저장 공간이 부족해요. CSV로 저장한 뒤 오래된 기록을 지워 주세요.'); } }
 
 // ---------- 상태 ----------
-let landmarker=null, stream=null, running=false, lastVideoTime=-1;
-let phase='aim', holdStart=0, burst=[], burstFails=0, rearmAt=0;
-let repeat={on:false,left:0,id:null};
-let layoutVotes={};
-let history=[];       // 흔들림 확인용 최근 위치
-let lastSpoken='', lastSpokenAt=0;
+let landmarker=null, FL=null, files=null, imgLandmarker=null, stream=null, running=false, lastVideoTime=-1;
+let phase='idle', holdStart=0, burst=[], burstFails=0, rearmAt=0;
+let session=null;                 // {queue:[...], i}
+let layoutVotes={}, history=[], lastSpoken='', lastSpokenAt=0, tilt={v:null,t:0}, lastNormalFrame=null;
+const lightCanvas=document.createElement('canvas'); lightCanvas.width=160; lightCanvas.height=120;
+const lctx=lightCanvas.getContext('2d',{willReadFrequently:true});
+const proc=document.createElement('canvas'), pctx=proc.getContext('2d',{willReadFrequently:true});
+const video=$('video'), overlay=$('overlay'), octx=overlay.getContext('2d');
+
+function setMsg(t){ const m=$('msg'); m.hidden=!t; m.textContent=t||''; }
 function speak(t, force){
   if(!$('voice').checked || !('speechSynthesis' in window) || !t) return;
   const now=performance.now();
@@ -332,21 +571,103 @@ function speak(t, force){
   lastSpoken=t; lastSpokenAt=now;
   try{ speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(t); u.lang='ko-KR'; u.rate=1.05; speechSynthesis.speak(u); }catch(e){}
 }
-const lightCanvas=document.createElement('canvas'); lightCanvas.width=160; lightCanvas.height=120;
-const lctx=lightCanvas.getContext('2d',{willReadFrequently:true});
-const video=$('video'), overlay=$('overlay'), octx=overlay.getContext('2d');
+function onOrient(e){
+  const ang=(screen.orientation&&screen.orientation.angle)||window.orientation||0;
+  const v=(Math.abs(ang)===90||ang===270)?e.beta:e.gamma;
+  if(v!=null) tilt={v, t:performance.now()};
+}
 
-function setMsg(t){ const m=$('msg'); m.hidden=!t; m.textContent=t||''; }
+// ---------- 실험 조건 ----------
+const TARGET={
+  '고개 좌우 2°':{yaw:2,skip:'yaw'}, '고개 좌우 4°':{yaw:4,skip:'yaw'}, '고개 좌우 6°':{yaw:6,skip:'yaw'},
+  '끄덕임 위':{pitch:-5,skip:'pitch'}, '끄덕임 아래':{pitch:5,skip:'pitch'},
+  '더 가까이':{size:1.12,skip:'dist'}, '더 멀리':{size:0.88,skip:'dist'},
+  '옆으로 기울임':{roll:4,skip:'roll'}, '살짝 웃음':{smile:true,skip:'expr'},
+  '측면 조명':{}, '안경':{}, '저녁 시간':{}
+};
+const TAG_SAY={
+  '고개 좌우 2°':'고개를 아주 살짝 돌려서, 빨간 점을 옆으로 옮겨간 초록 원에 넣으세요',
+  '고개 좌우 4°':'고개를 조금 돌려서, 빨간 점을 초록 원에 넣으세요',
+  '고개 좌우 6°':'고개를 조금 더 돌려서, 빨간 점을 초록 원에 넣으세요',
+  '끄덕임 위':'턱을 살짝 들어서, 빨간 점을 위쪽 초록 원에 넣으세요',
+  '끄덕임 아래':'턱을 살짝 당겨서, 빨간 점을 아래쪽 초록 원에 넣으세요',
+  '더 가까이':'폰 쪽으로 한 뼘쯤 다가오세요','더 멀리':'폰에서 한 뼘쯤 물러나세요',
+  '옆으로 기울임':'고개를 한쪽 어깨 쪽으로 살짝 기울이세요',
+  '살짝 웃음':'살짝 웃은 채로 멈춰 주세요',
+  '측면 조명':'한쪽 옆에서만 빛이 오게 해 주세요. 스탠드나 창문 쪽으로 몸을 돌리면 돼요',
+  '안경':'안경을 쓰고 평소처럼 측정해요','저녁 시간':'저녁에 평소처럼 측정해요'
+};
+const KIND_NAME={normal:'정상 측정',repeat:'반복 측정',clahe:'흑백 보정 측정',cond:'실험 측정',extra:'추가 측정'};
 
-// ---------- 시작 ----------
+// ---------- 오늘의 실험 ----------
+const today=()=>dayKey(Date.now());
+function protoDates(){ return [...new Set(store.records.filter(r=>r.kind&&r.kind!=='extra').map(r=>dayKey(r.t)))].sort(); }
+function dayNum(){ const d=protoDates(), i=d.indexOf(today()); return i>=0?i+1:d.length+1; }
+function todayCount(kind, tag){ const t=today(); return store.records.filter(r=>r.kind===kind&&dayKey(r.t)===t&&(tag==null||r.tag===tag)).length; }
+function stepState(st){
+  const t=today();
+  if(st.k==='memo') return {done:!!store.days[t], text:'한 줄 메모', hint:'잠·술·짠 음식, 불편했던 점'};
+  if(st.k==='truth') return {done:store.truth.some(x=>dayKey(x.t)===t), text:'정답 시험', hint:'측정이 끝나면 자동으로 해요'};
+  if(st.k==='manual') return {done:!!store.manual[t], text:'다른 폰으로 측정', hint:st.text, manual:true};
+  const n=todayCount(st.k, st.k==='cond'?st.tag:null), name=st.k==='cond'?'실험: '+st.tag:KIND_NAME[st.k];
+  const hint={normal:'평소처럼 정면',repeat:'그대로 앉아 있으면 연속으로 재요',clahe:'같은 자세로, 앱이 흑백으로 바꿔서 재요',cond:TAG_SAY[st.tag]||''}[st.k];
+  return {done:n>=st.n, text:name, hint, count:`${Math.min(n,st.n)}/${st.n}`};
+}
+function buildQueue(){
+  const plan=planFor(dayNum()), q=[];
+  for(const st of plan.steps){
+    if(st.k==='normal'||st.k==='clahe'){ for(let i=todayCount(st.k);i<st.n;i++) q.push({kind:st.k,prep:st.k==='clahe',label:KIND_NAME[st.k]}); }
+    else if(st.k==='repeat'){ const rid='R'+Date.now(); for(let i=todayCount('repeat');i<st.n;i++) q.push({kind:'repeat',repeatId:rid,label:KIND_NAME.repeat}); }
+    else if(st.k==='cond'){ for(let i=todayCount('cond',st.tag);i<st.n;i++) q.push({kind:'cond',tag:st.tag,target:TARGET[st.tag]||{},label:'실험: '+st.tag}); }
+  }
+  return q;
+}
+function renderToday(){
+  const d=dayNum(), plan=planFor(d);
+  $('dayNum').firstChild.nodeValue=`${d}일`;
+  $('dayWeek').textContent=plan.week<=4?`${plan.week}주차 · 28일 중`:'실험 완료';
+  $('weekName').textContent=plan.name; $('weekGoal').textContent=plan.goal;
+  const ul=$('steps'); ul.innerHTML='';
+  const cur=session&&phase!=='idle'?session.queue[session.i]:null;
+  for(const st of plan.steps){
+    const s=stepState(st), li=document.createElement('li');
+    const isNow=cur&&((st.k===cur.kind)&&(st.k!=='cond'||st.tag===cur.tag));
+    li.className=(s.done?'done':'')+(isNow?' now':'');
+    const ck=document.createElement('span'); ck.className='ck'; ck.textContent=s.done?'✓':'';
+    const mid=document.createElement('div');
+    const t=document.createElement('div'); t.className='t'; t.textContent=s.text;
+    const h=document.createElement('div'); h.className='h'; h.textContent=s.hint||'';
+    mid.append(t,h);
+    const c=document.createElement('div'); c.className='c';
+    if(s.manual){ const b=document.createElement('button'); b.textContent=s.done?'했어요 ✓':'했어요'; b.onclick=()=>{ store.manual[today()]=!store.manual[today()]; save(); renderToday(); }; c.appendChild(b); }
+    else c.textContent=s.count||'';
+    li.append(ck,mid,c); ul.appendChild(li);
+  }
+  const q=buildQueue(), go=$('btnGo');
+  if(session&&phase!=='idle'){ go.textContent='측정 멈추기'; go.classList.remove('primary'); }
+  else{
+    go.classList.add('primary');
+    go.textContent= q.length ? `${todayCount('normal')||todayCount('repeat')||todayCount('cond')?'이어서 하기':'오늘 측정 시작'} · ${q.length}회, 약 ${Math.max(1,Math.round(q.length*12/60))}분` : '오늘 측정 끝! 추가 측정 1회';
+  }
+  const m=store.days[today()];
+  $('memoState').textContent=m?'저장됨':'';
+  if(m && document.activeElement?.closest?.('#memoBox')==null){ $('mSleep').value=m.sleep??''; $('mAlc').checked=!!m.alcohol; $('mSalt').checked=!!m.salty; $('mNote').value=m.note||''; }
+}
+$('btnMemo').onclick=()=>{
+  const v=parseFloat($('mSleep').value);
+  store.days[today()]={sleep:isFinite(v)?v:null, alcohol:$('mAlc').checked, salty:$('mSalt').checked, note:$('mNote').value.trim(), t:new Date().toISOString()};
+  save(); renderToday(); renderSummary();
+};
+
+// ---------- 카메라·모델 ----------
 async function initModel(){
   $('engineState').textContent='얼굴 인식 모델 불러오는 중…';
   const {FaceLandmarker, FilesetResolver}=await import(`${LIB}/vision_bundle.mjs`);
-  const files=await FilesetResolver.forVisionTasks(`${LIB}/wasm`);
+  FL=FaceLandmarker; files=await FilesetResolver.forVisionTasks(`${LIB}/wasm`);
   const opts=d=>({baseOptions:{modelAssetPath:MODEL,delegate:d},runningMode:'VIDEO',numFaces:1,
     outputFaceBlendshapes:true,outputFacialTransformationMatrixes:true});
-  try{ landmarker=await FaceLandmarker.createFromOptions(files,opts('GPU')); }
-  catch(e){ landmarker=await FaceLandmarker.createFromOptions(files,opts('CPU')); }
+  try{ landmarker=await FL.createFromOptions(files,opts('GPU')); }
+  catch(e){ landmarker=await FL.createFromOptions(files,opts('CPU')); }
   $('engineState').textContent='측정 준비 완료';
 }
 async function startCamera(){
@@ -356,36 +677,94 @@ async function startCamera(){
   video.srcObject=stream; await video.play();
   $('stage').classList.toggle('mirror', facing==='user');
   overlay.width=video.videoWidth; overlay.height=video.videoHeight;
+  proc.width=Math.min(1280,video.videoWidth); proc.height=Math.round(proc.width*video.videoHeight/video.videoWidth);
   $('stage').style.aspectRatio=`${video.videoWidth}/${video.videoHeight}`;
   lightCanvas.height=Math.round(160*video.videoHeight/video.videoWidth);
+  applyRing();
 }
-$('btnStart').onclick=async()=>{
-  $('btnStart').disabled=true;
-  try{ if('speechSynthesis' in window){ const u=new SpeechSynthesisUtterance(''); speechSynthesis.speak(u); } }catch(e){}
+function applyRing(){ $('stagewrap').classList.toggle('lit', $('ringOn').checked && $('camSel').value==='user'); }
+$('ringOn').onchange=applyRing;
+async function ensureRunning(){
+  if(running) return true;
+  try{ if('speechSynthesis' in window){ speechSynthesis.speak(new SpeechSynthesisUtterance('')); } }catch(e){}
+  try{ if(window.DeviceOrientationEvent&&typeof DeviceOrientationEvent.requestPermission==='function') await DeviceOrientationEvent.requestPermission(); }catch(e){}
+  window.addEventListener('deviceorientation', onOrient);
   try{
     await Promise.all([landmarker?null:initModel(), startCamera()]);
-    $('startCover').hidden=true; running=true; requestAnimationFrame(loop);
+    $('startCover').hidden=true; running=true; requestAnimationFrame(loop); return true;
   }catch(e){
-    $('btnStart').disabled=false;
     const why = e && e.name==='NotAllowedError' ? '카메라 권한이 거부됐어요. 주소창의 카메라 아이콘에서 허용해 주세요.'
       : e && e.name==='NotFoundError' ? '카메라를 찾지 못했어요.'
       : '시작하지 못했어요. 인터넷 연결(모델 다운로드)과 카메라를 확인해 주세요. ('+(e&&e.message||e)+')';
-    $('engineState').textContent=why;
+    $('engineState').textContent=why; return false;
   }
+}
+$('camSel').onchange=async()=>{ applyRing(); if(running){ await startCamera(); holdStart=0; } };
+
+// ---------- 세션 ----------
+function curItem(){ return session&&phase!=='idle'?session.queue[session.i]:null; }
+function announce(item, first){
+  const pre=first?'시작할게요. ':'';
+  let t= item.kind==='cond' ? `${pre}다음은 실험 측정이에요. ${TAG_SAY[item.tag]||''}`
+       : item.kind==='repeat' ? `${pre}반복 측정이에요. 자리에서 움직이지 말고 그대로 계세요`
+       : item.kind==='clahe' ? `${pre}흑백 보정 측정이에요. 같은 자세로 계세요`
+       : `${pre}정면을 보고 빨간 점을 초록 원에 넣으세요`;
+  speak(t,true);
+  $('stepBadge').hidden=false; $('stepBadge').textContent=`${item.label} · ${session.i+1}/${session.queue.length}`;
+}
+$('btnGo').onclick=async()=>{
+  if(session&&phase!=='idle'){ endSession(false); return; }
+  $('btnGo').disabled=true;
+  const ok=await ensureRunning();
+  $('btnGo').disabled=false;
+  if(!ok) return;
+  let q=buildQueue();
+  if(!q.length) q=[{kind:'extra',label:KIND_NAME.extra}];
+  session={queue:q,i:0}; phase='aim'; holdStart=0; burst=[];
+  $('stage').scrollIntoView({behavior:'smooth',block:'center'});
+  announce(q[0],true); renderToday();
 };
-$('camSel').onchange=async()=>{ if(running){ await startCamera(); resetAim(); } };
+function nextItem(){
+  const prev=session.queue[session.i];
+  session.i++;
+  if(session.i>=session.queue.length){ endSession(true); return; }
+  const item=session.queue[session.i], changed=item.kind!==prev.kind||item.tag!==prev.tag;
+  phase='rest'; rearmAt=performance.now()+(changed?3500:1800); holdStart=0;
+  if(changed) announce(item,false); else { $('stepBadge').textContent=`${item.label} · ${session.i+1}/${session.queue.length}`; }
+}
+async function endSession(finished){
+  phase='idle'; session=null; setRing(0); $('stepBadge').hidden=true;
+  renderToday();
+  if(!finished){ setMsg('멈췄어요. 이어서 하려면 위의 버튼을 누르세요.'); return; }
+  const plan=planFor(dayNum());
+  const needTruth=plan.steps.some(s=>s.k==='truth') && !store.truth.some(x=>dayKey(x.t)===today());
+  if(needTruth&&lastNormalFrame){ setMsg('측정 끝! 정답 시험을 하는 중이에요…'); await runTruth(); }
+  const memoNeeded=!store.days[today()];
+  setMsg(memoNeeded?'오늘 측정 끝! 위에 한 줄 메모만 남기면 돼요.':'오늘 측정 끝! 수고했어요.');
+  speak(memoNeeded?'오늘 측정 끝. 한 줄 메모만 남기면 돼요':'오늘 측정 끝. 수고했어요',true);
+  renderToday(); renderSummary();
+}
 
 // ---------- 매 프레임 ----------
+function prepFrame(){
+  const w=proc.width,h=proc.height;
+  pctx.drawImage(video,0,0,w,h);
+  const img=pctx.getImageData(0,0,w,h), d=img.data, g=new Uint8Array(w*h);
+  for(let i=0,j=0;j<g.length;i+=4,j++) g[j]=(d[i]*77+d[i+1]*150+d[i+2]*29)>>8;
+  const o=clahe(g,w,h,8,2.0);
+  for(let i=0,j=0;j<o.length;i+=4,j++){ d[i]=d[i+1]=d[i+2]=o[j]; }
+  pctx.putImageData(img,0,0); return proc;
+}
 function loop(){
   if(!running) return;
   if(video.readyState>=2 && video.currentTime!==lastVideoTime){
     lastVideoTime=video.currentTime;
-    const res=landmarker.detectForVideo(video, performance.now());
+    const it=curItem(), input=it&&it.prep?prepFrame():video;
+    const res=landmarker.detectForVideo(input, performance.now());
     step(res);
   }
   requestAnimationFrame(loop);
 }
-
 function cheekLight(P){
   const W=lightCanvas.width,H=lightCanvas.height;
   lctx.drawImage(video,0,0,W,H);
@@ -396,13 +775,11 @@ function cheekLight(P){
   const a=patch(P[IDX.rCheek]), b=patch(P[IDX.lCheek]);
   return {mean:(a+b)/2, ratio:Math.min(a,b)/Math.max(a,b)};
 }
-
 function evaluate(res){
   const W=video.videoWidth,H=video.videoHeight;
   if(!res.faceLandmarks||!res.faceLandmarks.length) return {face:false};
-  const P=res.faceLandmarks[0].map(p=>({x:p.x*W,y:p.y*H}));
+  const L=res.faceLandmarks[0], P=L.map(p=>({x:p.x*W,y:p.y*H}));
   const d=res.facialTransformationMatrixes&&res.facialTransformationMatrixes[0]?res.facialTransformationMatrixes[0].data:null;
-  // 행렬 형식·방향 자동 판별: 눈꼬리 선 각도와 가장 가까운 해석을 고른다
   const opts=['col+','row+','col-','row-'];
   let layout=store.layout||'col+';
   if(d && !store.layout){
@@ -417,34 +794,39 @@ function evaluate(res){
     layout=opts.reduce((a,b)=>(layoutVotes[b]||0)>(layoutVotes[a]||0)?b:a);
   }
   const pose=d?poseFromMatrix(d,layout):{rollRad:eyeLineAngle(P),roll:eyeLineAngle(P)*180/Math.PI,pitch:0,yaw:0};
-  const dir=faceDirection(res.faceLandmarks[0],W,H);
+  const dir=faceDirection(L,W,H);
   pose.yaw=dir.yaw; pose.pitch=dir.pitch; pose.eye=eyeLineAngle(P);
   const m=computeMetrics(P,pose.rollRad);
+  const frame={A:m, B:computeMetricsB(P), C:computeMetricsC(P), D:computeMetricsD(L,W,H,pose.rollRad), mmpp:mmPerPx(P)};
   const bs={}; (res.faceBlendshapes&&res.faceBlendshapes[0]?res.faceBlendshapes[0].categories:[]).forEach(c=>bs[c.categoryName]=c.score);
-  const size=m.fwPx/W;
-  const cx=P[IDX.nasion].x/W, cy=P[IDX.nasion].y/H;
+  const size=m.fwPx/W, cx=P[IDX.nasion].x/W, cy=P[IDX.nasion].y/H;
   const light=cheekLight(P);
-  // 흔들림
   history.push({x:P[IDX.noseTip].x,y:P[IDX.noseTip].y,cx:P[IDX.chin].x,cy:P[IDX.chin].y});
   if(history.length>8) history.shift();
   const rng=k=>Math.max(...history.map(h=>h[k]))-Math.min(...history.map(h=>h[k]));
   const motion=history.length<8?1:Math.max(rng('x'),rng('y'),rng('cx'),rng('cy'))/m.fwPx;
-  return {face:true,P,pose,m,bs,size,cx,cy,light,motion};
+  return {face:true,P,pose,m,frame,bs,size,cx,cy,light,motion};
 }
 
-const TOL={dist:7, pos:0.08, posFirst:0.13, yaw:4, pitch:4, pitchFirst:8, roll:3, motion:0.015};
-function checksFor(s){
-  const ref=store.ref, list=[];
-  const mirror=$('camSel').value==='user';
-  const add=(key,name,ok,val,hint,level)=>list.push({key,name,ok,val,hint,level});
+const TOL={level:2, dist:7, pos:0.08, posFirst:0.13, yaw:4, pitch:4, pitchFirst:8, roll:3, motion:0.015, aim:1.5};
+function goalAngles(T){
+  const ref=store.ref;
+  return {yaw:(ref?ref.yaw:0)+(T&&T.yaw||0), pitch:(ref?ref.pitch:0)+(T&&T.pitch||0)};
+}
+function checksFor(s,T){
+  T=T||{};
+  const ref=store.ref, list=[], mirror=$('camSel').value==='user';
+  const add=(key,name,ok,val,hint,level,info)=>list.push({key,name,ok,val,hint,level,info});
   if(!s.face){ add('face','얼굴 찾기',false,'—','얼굴이 화면에 다 보이게 해 주세요'); return list; }
   add('face','얼굴 찾기',true,'찾음','');
+  const hasTilt=tilt.v!=null && performance.now()-tilt.t<1500;
+  if(hasTilt) add('level','폰 수평',Math.abs(tilt.v)<=TOL.level,`${tilt.v.toFixed(1)}°`,'폰을 좌우로 기울지 않게 똑바로 세워 주세요',{v:tilt.v,lim:TOL.level,span:10});
   // 거리
   if(ref){
-    const r=s.size/ref.size, lim=TOL.dist/100;
-    add('dist','거리 (기준과 같게)',Math.abs(r-1)<=lim,`${((r-1)*100).toFixed(1)}%`,
+    const goal=T.size||1, r=s.size/(ref.size*goal), lim=T.size?0.04:TOL.dist/100;
+    add('dist',T.size?`목표 거리 (${T.size>1?'더 가까이':'더 멀리'})`:'거리 (기준과 같게)',Math.abs(r-1)<=lim,`${((r-1)*100).toFixed(1)}%`,
       r<1-lim?(r<0.85?'한 뼘 정도 앞으로 오세요':'조금만 앞으로 오세요'):r>1+lim?(r>1.15?'한 뼘 정도 뒤로 가세요':'조금만 뒤로 가세요'):'',
-      {v:(r-1)*100,lim:TOL.dist,span:25});
+      {v:(r-1)*100,lim:lim*100,span:25});
   }else{
     const okPx=s.m.fwPx>=160, okBig=s.size<=0.55;
     add('dist','거리',okPx&&okBig,`${Math.round(s.m.fwPx)}px`, !okPx?'너무 멀어요. 조금 앞으로 오세요':!okBig?'너무 가까워요. 조금 뒤로 가세요':'좋아요. 이 거리가 기준이 돼요');
@@ -452,62 +834,58 @@ function checksFor(s){
   // 위치
   const tx=ref?ref.cx:0.5, ty=ref?ref.cy:0.45, lim=ref?TOL.pos:TOL.posFirst;
   const dx=s.cx-tx, dy=s.cy-ty, sdx=mirror?-dx:dx;
-  let ph='얼굴을 원 가운데로 옮겨 주세요';
+  let ph='얼굴을 화면 가운데로 옮겨 주세요';
   if(mirror){ if(Math.abs(dx)>=Math.abs(dy)) ph= sdx<0?'몸을 오른쪽으로 조금 옮기세요':'몸을 왼쪽으로 조금 옮기세요';
     else ph= dy<0?'폰을 조금 위로 올리거나 몸을 낮추세요':'폰을 조금 아래로 내리거나 몸을 세우세요'; }
   add('pos','화면 위치',Math.abs(dx)<=lim&&Math.abs(dy)<=lim,`${(Math.hypot(dx,dy)*100).toFixed(1)}%`, ph);
   // 정면 (레이저 점)
-  const ty0=ref?ref.yaw:0, tp0=ref?ref.pitch:0, pl=ref?TOL.pitch:TOL.pitchFirst;
-  const ey=s.pose.yaw-ty0, ep=s.pose.pitch-tp0;
-  const yawOk=Math.abs(ey)<=TOL.yaw, pitOk=Math.abs(ep)<=pl;
-  // 화면 오른쪽(원본 영상) = 내 왼쪽. 얼굴이 내 왼쪽을 보면 오른쪽으로 돌리라고 안내
-  const yawHint= ey>0?'고개를 오른쪽으로 살짝 돌리세요':'고개를 왼쪽으로 살짝 돌리세요';
-  const pitHint= ep>0?'턱을 살짝 드세요':'턱을 살짝 당기세요';
-  add('yaw','좌우 돌림',yawOk,`${ey.toFixed(1)}°`, yawHint+' (빨간 점을 초록 원 안으로)',{v:ey,lim:TOL.yaw,span:15});
-  add('pitch',ref?'위아래 (기준과 같게)':'위아래',pitOk,`${ep.toFixed(1)}°`, pitHint+' (빨간 점을 초록 원 안으로)',{v:ep,lim:pl,span:15});
-  // 기울기: 눈꼬리 선 기준 방향 안내 (+면 내 왼쪽이 낮음)
-  const rollHint= s.pose.eye>0?'고개를 오른쪽 어깨 쪽으로 살짝 기울이세요':'고개를 왼쪽 어깨 쪽으로 살짝 기울이세요';
-  add('roll','옆으로 기울기',Math.abs(s.pose.roll)<=TOL.roll,`${s.pose.roll.toFixed(1)}°`, rollHint+' (파란 선을 수평선에)',{v:s.pose.roll,lim:TOL.roll,span:12});
-  // 조명
-  const lok=s.light.mean>=60&&s.light.mean<=215&&s.light.ratio>=0.85;
-  add('light','조명',lok,`좌우 ${Math.round(s.light.ratio*100)}%`, s.light.mean<60?'너무 어두워요. 불을 켜 주세요':s.light.mean>215?'너무 밝아요':s.light.ratio<0.85?'한쪽에 그림자가 있어요. 빛을 정면에서 받아 주세요':'');
+  const g=goalAngles(T), ey=s.pose.yaw-g.yaw, ep=s.pose.pitch-g.pitch;
+  const yl=T.yaw?TOL.aim:TOL.yaw, pl=T.pitch?TOL.aim:(ref?TOL.pitch:TOL.pitchFirst);
+  add('yaw',T.yaw?`목표: 고개 ${T.yaw}° 돌리기`:'좌우 돌림',Math.abs(ey)<=yl,`${ey.toFixed(1)}°`,(ey>0?'고개를 오른쪽으로 살짝 돌리세요':'고개를 왼쪽으로 살짝 돌리세요')+' (빨간 점을 초록 원 안으로)',{v:ey,lim:yl,span:15});
+  add('pitch',T.pitch?`목표: 턱 ${T.pitch<0?'들기':'당기기'}`:(ref?'위아래 (기준과 같게)':'위아래'),Math.abs(ep)<=pl,`${ep.toFixed(1)}°`,(ep>0?'턱을 살짝 드세요':'턱을 살짝 당기세요')+' (빨간 점을 초록 원 안으로)',{v:ep,lim:pl,span:15});
+  // 기울기
+  if(T.roll){
+    const e=Math.abs(s.pose.roll)-T.roll;
+    add('roll',`목표: 고개 ${T.roll}° 기울이기`,Math.abs(e)<=TOL.aim,`${s.pose.roll.toFixed(1)}°`, e<0?'고개를 조금 더 기울이세요':'조금 덜 기울이세요',{v:e,lim:TOL.aim,span:8});
+  }else{
+    const rollHint= s.pose.eye>0?'고개를 오른쪽 어깨 쪽으로 살짝 기울이세요':'고개를 왼쪽 어깨 쪽으로 살짝 기울이세요';
+    add('roll','옆으로 기울기',Math.abs(s.pose.roll)<=TOL.roll,`${s.pose.roll.toFixed(1)}°`, rollHint+' (파란 선을 흰 선에)',{v:s.pose.roll,lim:TOL.roll,span:12});
+  }
+  // 조명: 막지 않고 기록만
+  const lgood=s.light.mean>=60&&s.light.mean<=215&&s.light.ratio>=0.85;
+  add('light','조명 (기록만)',true,`좌우 ${Math.round(s.light.ratio*100)}%`, lgood?'':(s.light.mean<60?'조금 어두워요. 측정은 계속해요':s.light.mean>215?'조금 밝아요. 측정은 계속해요':'한쪽에 그림자가 있어요. 측정은 계속해요'),null,!lgood);
   // 표정
   const smile=Math.max(s.bs.mouthSmileLeft||0,s.bs.mouthSmileRight||0), jaw=s.bs.jawOpen||0, blink=Math.max(s.bs.eyeBlinkLeft||0,s.bs.eyeBlinkRight||0);
-  add('expr','무표정',smile<0.25&&jaw<0.12&&blink<0.45,'', smile>=0.25?'웃음을 풀어 주세요':jaw>=0.12?'입을 다물어 주세요':blink>=0.45?'눈을 떠 주세요':'');
+  if(T.smile) add('expr','목표: 살짝 웃음',smile>=0.3&&jaw<0.15&&blink<0.45,'', smile<0.3?'조금만 더 웃어 주세요':jaw>=0.15?'입은 다물어 주세요':'눈을 떠 주세요');
+  else add('expr','무표정',smile<0.25&&jaw<0.12&&blink<0.45,'', smile>=0.25?'웃음을 풀어 주세요':jaw>=0.12?'입을 다물어 주세요':blink>=0.45?'눈을 떠 주세요':'');
   add('still','멈춤',s.motion<TOL.motion,'', '잠깐 그대로 멈춰 주세요');
   return list;
 }
-
 function renderChecks(list){
-  const box=$('checks');
-  box.innerHTML='';
+  const box=$('checks'); box.innerHTML='';
   for(const c of list){
-    const el=document.createElement('div'); el.className='check '+(c.ok?'ok':'bad');
+    const el=document.createElement('div'); el.className='check '+(c.info?'warn':c.ok?'ok':'bad');
     const dot=document.createElement('span'); dot.className='dot';
     const mid=document.createElement('div');
-    const nm=document.createElement('div'); nm.className='name'; nm.textContent=c.name;
-    mid.appendChild(nm);
-    if(!c.ok&&c.hint){ const h=document.createElement('div'); h.className='hint'; h.textContent=c.hint; mid.appendChild(h); }
-    else if(c.ok&&c.hint&&c.key==='dist'){ const h=document.createElement('div'); h.className='hint'; h.textContent=c.hint; mid.appendChild(h); }
+    const nm=document.createElement('div'); nm.className='name'; nm.textContent=c.name; mid.appendChild(nm);
+    if((!c.ok||c.info||c.key==='dist')&&c.hint){ const h=document.createElement('div'); h.className='hint'; h.textContent=c.hint; mid.appendChild(h); }
     if(c.level){
       const lv=document.createElement('div'); lv.className='level';
       const z=document.createElement('div'); z.className='zone';
       const half=c.level.lim/c.level.span*50; z.style.left=(50-half)+'%'; z.style.width=(half*2)+'%';
       const b=document.createElement('div'); b.className='bubble';
-      const pos=50+Math.max(-1,Math.min(1,c.level.v/c.level.span))*50; b.style.left=pos+'%';
+      b.style.left=(50+Math.max(-1,Math.min(1,c.level.v/c.level.span))*50)+'%';
       lv.append(z,b); mid.appendChild(lv);
     }
     const v=document.createElement('div'); v.className='val'; v.textContent=c.val;
     el.append(dot,mid,v); box.appendChild(el);
   }
 }
-
-function drawOverlay(s,allOk){
+function drawOverlay(s,allOk,T){
   const W=overlay.width,H=overlay.height; octx.clearRect(0,0,W,H);
-  // 목표 원
   const ref=store.ref, tx=(ref?ref.cx:0.5)*W, ty=(ref?ref.cy:0.45)*H;
   const curSize=s.face?Math.max(0.18,Math.min(0.55,s.size)):0.3;
-  const rw=(ref?ref.size:curSize)*W*0.62;
+  const rw=(ref?ref.size*((T&&T.size)||1):curSize)*W*0.62;
   octx.lineWidth=Math.max(2,W/400);
   octx.strokeStyle=allOk?'rgba(60,199,156,.95)':'rgba(255,255,255,.7)';
   octx.setLineDash([W/80,W/120]);
@@ -516,19 +894,19 @@ function drawOverlay(s,allOk){
   const P=s.P, r=Math.max(2,W/360);
   octx.fillStyle='rgba(255,255,255,.85)';
   [IDX.rFace,IDX.lFace,IDX.chin,IDX.nasion,IDX.noseTip,IDX.rMouth,IDX.lMouth,...IDX.rEye,...IDX.lEye,IDX.rJaw,IDX.lJaw].forEach(i=>{octx.beginPath();octx.arc(P[i].x,P[i].y,r,0,Math.PI*2);octx.fill();});
-  // 레이저 포인터: 코끝에서 얼굴이 향하는 방향으로 빔
-  const K=s.m.fwPx*2.2, rad=Math.PI/180, n=P[IDX.noseTip];
-  const tyaw=ref?ref.yaw:0, tpit=ref?ref.pitch:0;
-  const goal={x:n.x+Math.tan(tyaw*rad)*K, y:n.y+Math.tan(tpit*rad)*K};
+  // 레이저 포인터
+  const K=s.m.fwPx*2.2, rad=Math.PI/180, n=P[IDX.noseTip], g=goalAngles(T);
+  const yl=T&&T.yaw?TOL.aim:TOL.yaw;
+  const goal={x:n.x+Math.tan(g.yaw*rad)*K, y:n.y+Math.tan(g.pitch*rad)*K};
   const dot={x:n.x+Math.tan(s.pose.yaw*rad)*K, y:n.y+Math.tan(s.pose.pitch*rad)*K};
-  const aimOk=Math.abs(s.pose.yaw-tyaw)<=TOL.yaw && Math.abs(s.pose.pitch-tpit)<=(ref?TOL.pitch:TOL.pitchFirst);
+  const aimOk=Math.abs(s.pose.yaw-g.yaw)<=yl && Math.abs(s.pose.pitch-g.pitch)<=(T&&T.pitch?TOL.aim:(ref?TOL.pitch:TOL.pitchFirst));
   octx.lineWidth=Math.max(3,W/300);
-  octx.strokeStyle=aimOk?'rgba(60,199,156,.95)':'rgba(60,199,156,.75)';
-  octx.beginPath(); octx.arc(goal.x,goal.y,Math.tan(TOL.yaw*rad)*K,0,Math.PI*2); octx.stroke();
+  octx.strokeStyle='rgba(60,199,156,.9)';
+  octx.beginPath(); octx.arc(goal.x,goal.y,Math.tan(yl*rad)*K,0,Math.PI*2); octx.stroke();
   octx.strokeStyle='rgba(238,90,80,.55)'; octx.beginPath(); octx.moveTo(n.x,n.y); octx.lineTo(dot.x,dot.y); octx.stroke();
   octx.fillStyle=aimOk?'rgba(60,199,156,1)':'rgba(238,90,80,1)';
   octx.beginPath(); octx.arc(dot.x,dot.y,Math.max(6,W/120),0,Math.PI*2); octx.fill();
-  // 수평계: 이마 위 고정 수평선(흰색)과 얼굴 기울기 선(파란색)
+  // 수평계
   const c=P[IDX.top], L=s.m.fwPx*0.6, a=s.pose.rollRad, rollOk=Math.abs(s.pose.roll)<=TOL.roll;
   octx.lineWidth=Math.max(2,W/400);
   octx.strokeStyle='rgba(255,255,255,.75)'; octx.beginPath(); octx.moveTo(c.x-L,c.y-W/60); octx.lineTo(c.x+L,c.y-W/60); octx.stroke();
@@ -536,17 +914,19 @@ function drawOverlay(s,allOk){
   octx.strokeStyle=rollOk?'rgba(60,199,156,.95)':'rgba(111,179,211,.95)'; octx.beginPath();
   octx.moveTo(c.x-Math.cos(a)*L,c.y-W/60-Math.sin(a)*L); octx.lineTo(c.x+Math.cos(a)*L,c.y-W/60+Math.sin(a)*L); octx.stroke();
 }
-
 function setRing(frac){ $('ring').hidden=frac<=0; $('ringArc').setAttribute('stroke-dashoffset',String(138.2*(1-Math.min(1,frac)))); }
-function resetAim(){ phase='aim'; holdStart=0; burst=[]; burstFails=0; setRing(0); }
 
 const HOLD=500;
 function step(res){
-  const s=evaluate(res), list=checksFor(s), allOk=list.every(c=>c.ok);
-  renderChecks(list); drawOverlay(s,allOk);
+  const it=curItem(), T=it&&it.target;
+  const s=evaluate(res), list=checksFor(s,T), allOk=list.every(c=>c.ok);
+  renderChecks(list); drawOverlay(s,allOk,T);
   const now=performance.now();
-  if(phase==='rest'){ if(now>=rearmAt){ resetAim(); } else { setMsg(`잠깐 쉬어요… 다음 측정 ${Math.ceil((rearmAt-now)/1000)}초 뒤 (${repeat.left}회 남음)`); return; } }
-  if(phase==='done'){ return; }
+  if(phase==='idle'){ setRing(0); return; }
+  if(phase==='rest'){
+    if(now>=rearmAt){ phase='aim'; holdStart=0; }
+    else { setMsg(`다음 측정 준비… ${Math.ceil((rearmAt-now)/1000)}초`); return; }
+  }
   if(phase==='aim'){
     if(allOk){ if(!holdStart){ holdStart=now; speak('좋아요, 그대로 멈추세요',true); } const f=(now-holdStart)/HOLD; setRing(f*0.3); setMsg('좋아요, 그대로…'); if(f>=1){ phase='burst'; burst=[]; burstFails=0; } }
     else { holdStart=0; setRing(0); const bad=list.find(c=>!c.ok); const t=bad?(bad.hint||bad.name+' 확인'):''; setMsg(t); speak(t.replace(/\s*\(.*\)$/,'')); }
@@ -554,124 +934,140 @@ function step(res){
   }
   if(phase==='burst'){
     const N=+$('burstN').value;
-    if(allOk){ burst.push(s.m); } else if(++burstFails>Math.ceil(N/3)){ resetAim(); setMsg('움직임이 있어서 다시 맞출게요'); return; }
+    if(allOk){ burst.push(s.frame); } else if(++burstFails>Math.ceil(N/3)){ phase='aim'; holdStart=0; setRing(0); setMsg('움직임이 있어서 다시 맞출게요'); return; }
     setRing(0.3+0.7*burst.length/N); setMsg(`측정 중… ${burst.length}/${N}`);
     if(burst.length>=N) finish(s);
   }
 }
-
-function thumb(){
-  const c=document.createElement('canvas'), w=200, h=Math.round(200*video.videoHeight/video.videoWidth);
-  c.width=w; c.height=h; c.getContext('2d').drawImage(video,0,0,w,h);
-  try{ return c.toDataURL('image/jpeg',0.7); }catch(e){ return ''; }
+function snap(w){
+  const c=document.createElement('canvas'); c.width=w; c.height=Math.round(w*video.videoHeight/video.videoWidth);
+  c.getContext('2d').drawImage(video,0,0,c.width,c.height); return c;
 }
-
 function finish(s){
-  const sum=summarize(burst);
-  const rec={id:Date.now(), t:new Date().toISOString(), m:sum.m, sd:sum.sd, n:burst.length,
-    cond:{yaw:+s.pose.yaw.toFixed(2),pitch:+s.pose.pitch.toFixed(2),roll:+s.pose.roll.toFixed(2),size:+s.size.toFixed(4),light:+s.light.ratio.toFixed(3)},
-    cam:$('camSel').value, repeatId:repeat.on?repeat.id:null, img:thumb()};
+  const it=curItem();
+  const sA=summarize(burst.map(f=>f.A)), sB=summarize(burst.map(f=>f.B)), sC=summarize(burst.map(f=>f.C)), sD=summarize(burst.map(f=>f.D));
+  const mm=burst.map(f=>f.mmpp).filter(v=>v), mmpp=mm.length?median(mm):null;
+  if(it.kind==='normal'||it.kind==='repeat'||it.kind==='extra'){ lastNormalFrame=snap(video.videoWidth); $('btnTruth').disabled=false; }
+  let img=''; try{ img=snap(160).toDataURL('image/jpeg',0.6); }catch(e){}
+  const rec={id:Date.now(), v:4, t:new Date().toISOString(), day:dayNum(), kind:it.kind, tag:it.tag||'', prep:!!it.prep, repeatId:it.repeatId||null,
+    m:sA.m, sd:sA.sd, mB:sB.m, sdB:sB.sd, mC:sC.m, sdC:sC.sd, mD:sD.m, sdD:sD.sd, mmpp,
+    level:(tilt.v!=null&&performance.now()-tilt.t<1500)?+tilt.v.toFixed(2):null, n:burst.length,
+    cond:{yaw:+s.pose.yaw.toFixed(2),pitch:+s.pose.pitch.toFixed(2),roll:+s.pose.roll.toFixed(2),size:+s.size.toFixed(4),light:+s.light.ratio.toFixed(3),lightMean:Math.round(s.light.mean)},
+    cam:$('camSel').value, img};
   let newRef=false;
-  if(!store.ref){ store.ref={v:2,size:s.size,cx:s.cx,cy:s.cy,pitch:s.pose.pitch,yaw:0,cam:$('camSel').value,t:rec.t}; newRef=true; }
+  if(!store.ref&&(it.kind==='normal'||it.kind==='extra')){ store.ref={v:2,size:s.size,cx:s.cx,cy:s.cy,pitch:s.pose.pitch,yaw:0,cam:$('camSel').value,t:rec.t}; newRef=true; }
   store.records.push(rec); save();
-  renderAll();
   setRing(1);
-  if(repeat.on){
-    repeat.left--;
-    if(repeat.left>0){ speak(`${repeat.left}번 남았어요`,true); phase='rest'; rearmAt=performance.now()+2500; return; }
-    repeat.on=false; $('repeatMode').checked=false; $('consScope').value='last';
-    renderConsistency();
-  }
-  phase='done';
-  setMsg(newRef?'측정 완료! 이 자세가 기준 자세로 저장됐어요.':'측정 완료!');
-  speak(newRef?'측정 완료. 기준 자세로 저장했어요':'측정 완료',true);
-  setTimeout(()=>{ if(phase==='done') resetAim(); }, 3500);
+  if(newRef) speak('첫 측정 완료. 이 자세를 기준으로 저장했어요',true);
+  renderAll();
+  nextItem();
 }
-
-$('repeatMode').onchange=e=>{
-  if(e.target.checked){ repeat={on:true,left:+$('repeatN').value,id:'R'+Date.now()}; resetAim(); }
-  else repeat.on=false;
-};
 
 // ---------- 결과 화면 ----------
 function faceCm(){ const v=parseFloat($('faceCm').value); return v>=10&&v<=20?v:null; }
 $('faceCm').value=store.faceCm||'';
 $('faceCm').oninput=()=>{ store.faceCm=faceCm(); save(); renderLatest(); };
-
-function fmt(v,dec){ return (v>=0&&dec===2?'+':'')+v.toFixed(dec); }
+$('showM').value=store.showM; $('showM').onchange=()=>{ store.showM=$('showM').value; save(); renderLatest(); renderTrend(); };
+function toMM(r, pct, m){ m=m||r.m; if(r.mmpp) return pct/100*m.fwPx*r.mmpp; const cm=faceCm(); return cm?pct/100*cm*10:null; }
+function fmt(v,dec){ return (v>=0?'+':'')+v.toFixed(dec); }
+const KEYS6=['eye','brow','mouth','chin','nose','width'];
 function renderLatest(){
-  const box=$('metrics'); box.innerHTML='';
+  const box=$('metrics'); box.innerHTML=''; $('methodBox').innerHTML='';
   const r=store.records[store.records.length-1];
-  if(!r){ $('lastWhen').textContent='아직 없음';
-    const p=document.createElement('div'); p.className='note'; p.textContent='카메라를 켜고 조건이 모두 초록색이 되면 자동으로 측정돼요.'; box.appendChild(p); return; }
-  $('lastWhen').textContent=new Date(r.t).toLocaleString('ko-KR');
-  const cm=faceCm();
+  if(!r){ $('lastWhen').textContent='아직 없음'; const p=document.createElement('div'); p.className='note'; p.textContent='오늘 측정을 시작하면 여기에 결과가 나와요.'; box.appendChild(p); return; }
+  const M=store.showM, m=r[MK[M]]||r.m, sdv=r['sd'+(M==='A'?'':M)]||r.sd;
+  $('lastWhen').textContent=new Date(r.t).toLocaleString('ko-KR')+` · ${KIND_NAME[r.kind]||'측정'}${r.tag?' ('+r.tag+')':''}`+(r.mmpp?' · 홍채 자 사용':'');
   for(const d of METRICS){
-    const v=r.m[d.k]; const el=document.createElement('div'); el.className='metric';
+    const v=m[d.k]; if(v==null) continue;
+    const el=document.createElement('div'); el.className='metric';
     const k=document.createElement('div'); k.className='k'; k.textContent=d.name;
     const val=document.createElement('div'); val.className='v';
-    val.textContent=(d.k==='total'?v.toFixed(2):d.unit==='%'?Math.abs(v).toFixed(2):v.toFixed(d.dec))+(d.unit);
+    const mm=d.mm?toMM(r,v,m):null;
+    val.textContent= mm!=null ? Math.abs(mm).toFixed(1)+'mm' : (d.k==='total'?v.toFixed(2):d.unit==='%'?Math.abs(v).toFixed(2):v.toFixed(d.dec))+d.unit;
     const de=document.createElement('div'); de.className='d';
     let t=d.hint||'';
-    if(d.pos&&Math.abs(v)>=0.05) t=(v>0?d.pos:d.neg);
-    if(d.pos&&Math.abs(v)<0.05) t='거의 같음';
-    t+=` · 흔들림 ±${r.sd[d.k].toFixed(d.dec)}`;
-    if(cm&&d.mm) t+=` · ≈${(Math.abs(v)/100*cm*10).toFixed(1)}mm`;
-    de.textContent=t;
-    el.append(k,val,de); box.appendChild(el);
+    if(d.pos) t=Math.abs(v)<0.05?'거의 같음':(v>0?d.pos:d.neg);
+    const e=mm!=null&&sdv?toMM(r,sdv[d.k],m):null;
+    t+= e!=null?` · 흔들림 ±${Math.abs(e).toFixed(1)}mm`:(sdv?` · 흔들림 ±${sdv[d.k].toFixed(d.dec)}`:'');
+    de.textContent=t; el.append(k,val,de);
+    const nl=noticeLevel(d.k,mm);
+    if(nl){ const tg=document.createElement('span'); tg.className='tag '+nl[0]; tg.textContent=nl[1]; tg.style.justifySelf='start'; el.appendChild(tg); }
+    box.appendChild(el);
+  }
+  if(r.mB&&r.mC&&r.mD){
+    const t=document.createElement('table'); const h=t.createTHead().insertRow();
+    ['항목','A 미간선','B 수직선','C 거울 겹치기','D 3D 보정'].forEach(x=>{const th=document.createElement('th'); th.textContent=x; h.appendChild(th);});
+    const b=t.createTBody();
+    for(const k of KEYS6){
+      const d=METRICS.find(x=>x.k===k), tr=b.insertRow(); const c0=tr.insertCell(); c0.textContent=d.name; c0.className='lbl';
+      for(const mm of [r.m,r.mB,r.mC,r.mD]){ const x=k!=='width'?toMM(r,mm[k],mm):null; tr.insertCell().textContent= x!=null?fmt(x,1)+'mm':fmt(mm[k],2)+'%'; }
+    }
+    const cap=t.createCaption(); cap.className='note';
+    cap.textContent=`같은 사진을 네 가지 방식으로 계산한 값이에요. 셋 이상이 비슷하면 계산 방식에 따라 답이 흔들리지 않는다는 뜻이에요.${r.level!=null?` 폰 기울기 ${r.level}°.`:''}`;
+    const w=document.createElement('div'); w.className='tablewrap'; w.appendChild(t); $('methodBox').appendChild(w);
   }
 }
 
-function scopeRecords(){
-  const sc=$('consScope').value, rs=store.records;
-  if(sc==='all') return rs;
-  if(sc==='today'){ const d=new Date().toDateString(); return rs.filter(r=>new Date(r.t).toDateString()===d); }
-  const ids=rs.filter(r=>r.repeatId).map(r=>r.repeatId); const last=ids[ids.length-1];
-  return last?rs.filter(r=>r.repeatId===last):[];
-}
-function renderConsistency(){
-  const t=$('consTable'); t.innerHTML='';
-  const rs=scopeRecords();
-  if(rs.length<2){ const tr=t.insertRow(); const td=tr.insertCell(); td.style.fontFamily='inherit'; td.style.whiteSpace='normal';
-    td.textContent=$('consScope').value==='last'?'아직 반복 테스트가 없어요. "반복 테스트"를 켜고 자리에 그대로 앉아 있으면 연속으로 재요.':'측정이 2회 이상 있어야 비교할 수 있어요.'; return; }
-  const head=t.createTHead().insertRow();
-  ['항목','평균','흔들림(SD)','최소~최대','판정'].forEach(h=>{const th=document.createElement('th'); th.textContent=h; head.appendChild(th);});
-  const body=t.createTBody();
-  for(const d of METRICS){
-    const a=rs.map(r=>r.m[d.k]); const s=sd(a);
-    const tr=body.insertRow();
-    const c0=tr.insertCell(); c0.textContent=d.name; c0.style.fontFamily='inherit';
-    tr.insertCell().textContent=mean(a).toFixed(d.dec)+d.unit;
-    tr.insertCell().textContent='±'+s.toFixed(d.dec);
-    tr.insertCell().textContent=Math.min(...a).toFixed(d.dec)+' ~ '+Math.max(...a).toFixed(d.dec);
-    const c4=tr.insertCell();
-    if(d.unit==='%'){ const [cls,txt]=verdict(s); const sp=document.createElement('span'); sp.className='tag '+cls; sp.textContent=txt; c4.appendChild(sp); }
-    else c4.textContent='—';
+function cellMM(td, v){ if(v==null){ td.textContent='—'; return; } td.textContent='±'+v.toFixed(2)+'mm'; td.className=v<=0.5?'pass':'fail'; }
+function renderSummary(){
+  const dates=protoDates(), d=dayNum();
+  $('progText').textContent=`${dates.length}일 기록 · 목표 28일`;
+  const dots=$('dots'); dots.innerHTML='';
+  for(let i=1;i<=28;i++){ const s=document.createElement('span'); if(i<=dates.length) s.className='on'; if(i===d) s.className+=' cur'; dots.appendChild(s); }
+  const box=$('sumBox'); box.innerHTML='';
+  const S=expSummary(store.records, store.truth);
+  if(!S.n.days&&!S.n.repeatSets&&!S.n.truth){ const p=document.createElement('div'); p.className='note'; p.textContent='측정이 쌓이면 여기에 실험 결과가 정리돼요. 합격선은 모두 0.5mm예요.'; box.appendChild(p); return; }
+  // 방식별 핵심 결과
+  const t=document.createElement('table'); const h=t.createTHead().insertRow();
+  ['검사 (합격 0.5mm)','A 미간선','B 수직선','C 거울 겹치기','D 3D 보정'].forEach(x=>{const th=document.createElement('th'); th.textContent=x; h.appendChild(th);});
+  const b=t.createTBody();
+  const rows=[['repeat',`반복 흔들림 (${S.n.repeatSets}세트)`],['daily',`날마다 흔들림 (${S.n.days}일, 3일부터)`],['truth',`정답 시험 오차 (${S.n.truth}회)`]];
+  for(const [k,label] of rows){ const tr=b.insertRow(); const c0=tr.insertCell(); c0.textContent=label; c0.className='lbl'; for(const M of METHODS) cellMM(tr.insertCell(), S.methods[M][k]); }
+  for(const M of METHODS) if(M===S.best){ const i=METHODS.indexOf(M)+1; h.cells[i].textContent='★ '+h.cells[i].textContent; }
+  const cap=t.createCaption(); cap.className='note';
+  cap.textContent=`눈·입꼬리·턱끝·코끝 4항목 평균. 흔들림은 표준편차, 정답 오차는 턱끝을 1·2·3mm 옮겼을 때 틀린 양이에요.${S.best?` ★ 지금까지 가장 좋은 방식: ${S.best}.`:''}`;
+  const w=document.createElement('div'); w.className='tablewrap'; w.appendChild(t); box.appendChild(w);
+  // 흑백 보정 비교
+  if(S.clahe.on!=null&&S.clahe.off!=null){
+    const p=document.createElement('div'); p.className='note';
+    const diff=S.clahe.on-S.clahe.off;
+    p.textContent=`흑백 보정 비교 (D 방식, 같은 날 측정끼리의 흔들림): 끔 ±${S.clahe.off.toFixed(2)}mm · 켬 ±${S.clahe.on.toFixed(2)}mm → ${Math.abs(diff)<0.03?'차이가 거의 없어요':diff<0?'켰을 때 덜 흔들려요':'껐을 때 덜 흔들려요'}. 며칠 더 쌓여야 확실해요.`;
+    box.appendChild(p);
   }
-  const cap=t.createCaption(); cap.className='note'; cap.style.textAlign='left'; cap.style.captionSide='bottom'; cap.style.paddingTop='8px';
-  cap.textContent=`${rs.length}회 측정 기준. 판정 기준(±0.3 안정, ±0.7까지 보통)은 처음 정한 값이라 데이터를 보며 조정해요.`;
+  // 방해꾼 시험
+  const tags=Object.keys(S.cond);
+  if(tags.length){
+    const t2=document.createElement('table'); const h2=t2.createTHead().insertRow();
+    ['방해꾼 (정상 대비 차이)','A','B','C','D'].forEach(x=>{const th=document.createElement('th'); th.textContent=x; h2.appendChild(th);});
+    const b2=t2.createTBody();
+    for(const tag of tags){ const tr=b2.insertRow(); const c0=tr.insertCell(); c0.textContent=tag; c0.className='lbl'; for(const M of METHODS){ const v=S.cond[tag][M], td=tr.insertCell(); if(v==null) td.textContent='—'; else { td.textContent=v.toFixed(2)+'mm'; td.className=v<=0.5?'pass':'fail'; } } }
+    const cap2=t2.createCaption(); cap2.className='note';
+    cap2.textContent='그날 정상 측정과 비교해 숫자가 얼마나 달라졌는지예요. 0.5mm를 넘는 실수는 앱이 막거나 계산으로 보정해야 해요.';
+    const w2=document.createElement('div'); w2.className='tablewrap'; w2.appendChild(t2); box.appendChild(w2);
+  }
 }
-$('consScope').onchange=renderConsistency;
 
 function renderTrend(){
   const box=$('trend'); box.innerHTML='';
-  const rs=store.records; if(rs.length<2){ const p=document.createElement('div'); p.className='note'; p.textContent='측정이 2회 이상 쌓이면 그래프가 그려져요.'; box.appendChild(p); return; }
-  const W=720,H=180,pl=40,pr=12,pt=12,pb=26;
-  const vals=rs.map(r=>r.m.total), max=Math.max(...vals)*1.15||1, min=0;
-  const x=i=>pl+(W-pl-pr)*(rs.length===1?0.5:i/(rs.length-1)), y=v=>pt+(H-pt-pb)*(1-(v-min)/(max-min));
+  const M=store.showM, g=groupBy(store.records.filter(r=>(r.kind==='normal'||(!r.kind&&r.m))&&r.mmpp&&r[MK[M]]), r=>dayKey(r.t));
+  const days=Object.keys(g).sort();
+  if(days.length<2){ const p=document.createElement('div'); p.className='note'; p.textContent='이틀 이상 측정하면 날짜별 그래프가 그려져요.'; box.appendChild(p); return; }
+  const vals=days.map(k=>mean(g[k].map(r=>mean(KEY4.map(q=>Math.abs(recMM(r,M,q))))))) ;
+  const W=720,H=180,pl=44,pr=12,pt=12,pb=26, max=Math.max(...vals)*1.2||1;
+  const x=i=>pl+(W-pl-pr)*(i/(days.length-1)), y=v=>pt+(H-pt-pb)*(1-v/max);
   const ns='http://www.w3.org/2000/svg', svg=document.createElementNS(ns,'svg');
-  svg.setAttribute('viewBox',`0 0 ${W} ${H}`); svg.setAttribute('width','100%'); svg.setAttribute('role','img'); svg.setAttribute('aria-label','종합 지수 추이');
+  svg.setAttribute('viewBox',`0 0 ${W} ${H}`); svg.setAttribute('width','100%'); svg.setAttribute('role','img'); svg.setAttribute('aria-label','날짜별 비대칭 평균');
   const mk=(tag,attrs)=>{const e=document.createElementNS(ns,tag); for(const k in attrs) e.setAttribute(k,attrs[k]); svg.appendChild(e); return e;};
-  for(let i=0;i<=3;i++){ const v=max*i/3, yy=y(v); mk('line',{x1:pl,x2:W-pr,y1:yy,y2:yy,stroke:'var(--line)','stroke-width':1}); const tx=mk('text',{x:pl-6,y:yy+4,'text-anchor':'end'}); tx.textContent=v.toFixed(1); }
+  for(let i=0;i<=3;i++){ const v=max*i/3, yy=y(v); mk('line',{x1:pl,x2:W-pr,y1:yy,y2:yy,stroke:'var(--line)','stroke-width':1}); const tx=mk('text',{x:pl-6,y:yy+4,'text-anchor':'end'}); tx.textContent=v.toFixed(1)+'mm'; }
   const pts=vals.map((v,i)=>`${x(i)},${y(v)}`).join(' ');
   mk('polygon',{points:`${x(0)},${y(0)} ${pts} ${x(vals.length-1)},${y(0)}`,fill:'var(--accent)','fill-opacity':.1});
   mk('polyline',{points:pts,fill:'none',stroke:'var(--accent)','stroke-width':2});
   vals.forEach((v,i)=>mk('circle',{cx:x(i),cy:y(v),r:i===vals.length-1?4.5:2.5,fill:'var(--accent)'}));
-  const f=mk('text',{x:pl,y:H-6}); f.textContent=new Date(rs[0].t).toLocaleDateString('ko-KR');
-  const l=mk('text',{x:W-pr,y:H-6,'text-anchor':'end'}); l.textContent=new Date(rs[rs.length-1].t).toLocaleDateString('ko-KR');
+  const f=mk('text',{x:pl,y:H-6}); f.textContent=days[0].slice(5);
+  const l=mk('text',{x:W-pr,y:H-6,'text-anchor':'end'}); l.textContent=days[days.length-1].slice(5);
   box.appendChild(svg);
+  const p=document.createElement('div'); p.className='note'; p.textContent=`눈·입꼬리·턱끝·코끝 비대칭(mm)의 하루 평균, 계산 방식 ${M}.`; box.appendChild(p);
 }
-
 function renderHist(){
   const box=$('hist'); box.innerHTML='';
   const rs=[...store.records].reverse();
@@ -680,9 +1076,10 @@ function renderHist(){
     const el=document.createElement('div'); el.className='rec';
     const img=document.createElement('img'); img.alt='측정 사진'; if(r.img) img.src=r.img;
     const mid=document.createElement('div');
-    const t=document.createElement('div'); t.className='t'; t.textContent=new Date(r.t).toLocaleString('ko-KR')+(r.repeatId?' · 반복':'');
+    const t=document.createElement('div'); t.className='t'; t.textContent=new Date(r.t).toLocaleString('ko-KR')+` · ${KIND_NAME[r.kind]||'이전 버전 측정'}${r.tag?' ('+r.tag+')':''}`;
     const s=document.createElement('div'); s.className='s';
-    s.textContent=`종합 ${r.m.total.toFixed(2)} · 턱끝 ${fmt(r.m.chin,2)} · 눈 ${fmt(r.m.eye,2)} · 입 ${fmt(r.m.mouth,2)} · 턱/광대 ${r.m.jaw.toFixed(3)}`;
+    const mm=k=>{ const v=recMM(r,'D',k); return v==null?'—':fmt(v,1); };
+    s.textContent= r.mD&&r.mmpp ? `D 방식 · 턱끝 ${mm('chin')} · 눈 ${mm('eye')} · 입 ${mm('mouth')} · 코 ${mm('nose')} (mm)` : `턱끝 ${fmt(r.m.chin,2)}% · 눈 ${fmt(r.m.eye,2)}%`;
     mid.append(t,s);
     const del=document.createElement('button'); del.textContent='삭제'; del.className='danger';
     del.onclick=()=>{ store.records=store.records.filter(x=>x.id!==r.id); save(); renderAll(); };
@@ -694,21 +1091,99 @@ function renderRef(){
   if(store.ref){ tag.className='tag ok'; tag.textContent='기준 자세 있음 · '+new Date(store.ref.t).toLocaleDateString('ko-KR'); }
   else { tag.className='tag warn'; tag.textContent='기준 자세 없음 (첫 측정 때 저장)'; }
 }
-function renderAll(){ renderLatest(); renderConsistency(); renderTrend(); renderHist(); renderRef(); }
+function renderAll(){ renderToday(); renderLatest(); renderSummary(); renderTrend(); renderHist(); renderRef(); }
 
-$('btnResetRef').onclick=()=>{ store.ref=null; save(); renderRef(); resetAim(); };
+$('btnResetRef').onclick=()=>{ store.ref=null; save(); renderRef(); };
 $('btnClear').onclick=()=>{ $('clearConfirm').hidden=false; };
 $('btnClearNo').onclick=()=>{ $('clearConfirm').hidden=true; };
-$('btnClearYes').onclick=()=>{ store={records:[],ref:null,layout:store.layout,faceCm:store.faceCm}; save(); $('clearConfirm').hidden=true; renderAll(); };
+$('btnClearYes').onclick=()=>{ store={records:[],ref:null,layout:store.layout,faceCm:store.faceCm,days:{},truth:[],manual:{},showM:store.showM}; save(); $('clearConfirm').hidden=true; renderAll(); };
+
+// ---------- CSV ----------
+const csvq=v=>{ const s=String(v??''); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
 $('btnCsv').onclick=()=>{
   const keys=METRICS.map(d=>d.k);
-  const rows=[['시간','반복ID','카메라',...keys,...keys.map(k=>k+'_sd'),'yaw','pitch','roll','size','light'].join(',')];
-  for(const r of store.records) rows.push([r.t,r.repeatId||'',r.cam,...keys.map(k=>r.m[k].toFixed(4)),...keys.map(k=>r.sd[k].toFixed(4)),r.cond.yaw,r.cond.pitch,r.cond.roll,r.cond.size,r.cond.light].join(','));
+  const head=['시간','날짜','실험일차','종류','조건','흑백보정','반복ID','카메라','mm_per_px','폰기울기','yaw','pitch','roll','size','조명_좌우','조명_밝기','잠','술','짠음식','메모'];
+  const sets=[['A','m','sd'],['B','mB','sdB'],['C','mC','sdC'],['D','mD','sdD']];
+  for(const [n] of sets) for(const k of keys) head.push(n+'_'+k, n+'_'+k+'_sd');
+  head.push('정답오차_A','정답오차_B','정답오차_C','정답오차_D');
+  const rows=[head.join(',')];
+  for(const r of store.records){
+    const dk=dayKey(r.t), memo=store.days[dk]||{};
+    const row=[r.t,dk,r.day??'',r.kind||'이전버전',r.tag||'',r.prep?1:0,r.repeatId||'',r.cam,r.mmpp?r.mmpp.toFixed(5):'',r.level??'',r.cond.yaw,r.cond.pitch,r.cond.roll,r.cond.size,r.cond.light,r.cond.lightMean??'',memo.sleep??'',memo.alcohol?1:'',memo.salty?1:'',memo.note||''];
+    for(const [,mk,sk] of sets) for(const k of keys){ const m=r[mk], sdv=r[sk]; row.push(m&&m[k]!=null?m[k].toFixed(4):'', sdv&&sdv[k]!=null?sdv[k].toFixed(4):''); }
+    row.push('','','','');
+    rows.push(row.map(csvq).join(','));
+  }
+  for(const t of store.truth){
+    const row=[t.t,dayKey(t.t),'','정답시험','','','','',t.mmpp?t.mmpp.toFixed(5):''];
+    while(row.length<head.length-4) row.push('');
+    row.push(...METHODS.map(M=>t.err&&t.err[M]!=null?t.err[M].toFixed(4):''));
+    rows.push(row.map(csvq).join(','));
+  }
   const blob=new Blob(['﻿'+rows.join('\n')],{type:'text/csv'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='얼굴수평계_기록.csv'; a.click();
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`얼굴수평계_${today()}.csv`; a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href),2000);
 };
+
+// ---------- 정답 시험 ----------
+function warpChin(src, chin, radius, shiftPx){
+  const W=src.width,H=src.height, out=document.createElement('canvas'); out.width=W; out.height=H;
+  const c2=out.getContext('2d'); c2.drawImage(src,0,0);
+  const x0=Math.max(0,Math.floor(chin.x-radius*2.5)), x1=Math.min(W,Math.ceil(chin.x+radius*2.5));
+  const y0=Math.max(0,Math.floor(chin.y-radius*2.5)), y1=Math.min(H,Math.ceil(chin.y+radius*2.5));
+  const sd2=2*(radius/1.6)*(radius/1.6);
+  const inp=src.getContext('2d').getImageData(0,0,W,H).data, img=c2.getImageData(x0,y0,x1-x0,y1-y0), o=img.data;
+  for(let y=y0;y<y1;y++) for(let x=x0;x<x1;x++){
+    const dx=shiftPx*Math.exp(-((x-chin.x)**2+(y-chin.y)**2)/sd2);
+    const sx=x-dx, xi=Math.floor(sx), f=sx-xi; if(xi<0||xi+1>=W) continue;
+    const a=(y*W+xi)*4, b=a+4, k=((y-y0)*(x1-x0)+(x-x0))*4;
+    for(let c=0;c<3;c++) o[k+c]=inp[a+c]*(1-f)+inp[b+c]*f;
+  }
+  c2.putImageData(img,x0,y0); return out;
+}
+function analyzeImage(cv){
+  const res=imgLandmarker.detect(cv); if(!res.faceLandmarks||!res.faceLandmarks.length) return null;
+  const W=cv.width,H=cv.height, L=res.faceLandmarks[0], P=L.map(p=>({x:p.x*W,y:p.y*H}));
+  const d=res.facialTransformationMatrixes&&res.facialTransformationMatrixes[0]?res.facialTransformationMatrixes[0].data:null;
+  const roll=d?poseFromMatrix(d,store.layout||'col+').rollRad:eyeLineAngle(P);
+  return {P, A:computeMetrics(P,roll), B:computeMetricsB(P), C:computeMetricsC(P), D:computeMetricsD(L,W,H,roll), mmpp:mmPerPx(P)};
+}
+async function runTruth(){
+  const box=$('truthBox'); box.innerHTML=''; const note=document.createElement('div'); note.className='note'; box.appendChild(note);
+  if(!lastNormalFrame){ note.textContent='먼저 정상 측정을 한 번 해 주세요.'; return; }
+  $('btnTruth').disabled=true; note.textContent='시험 사진 만드는 중…';
+  try{
+    if(!imgLandmarker) imgLandmarker=await FL.createFromOptions(files,{baseOptions:{modelAssetPath:MODEL,delegate:'CPU'},runningMode:'IMAGE',numFaces:1,outputFacialTransformationMatrixes:true});
+    const base=analyzeImage(lastNormalFrame);
+    if(!base||!base.mmpp){ note.textContent='사진에서 얼굴이나 홍채를 찾지 못했어요. 조금 더 가까이에서 다시 측정해 주세요.'; return; }
+    const t=document.createElement('table'); const h=t.createTHead().insertRow();
+    ['옮긴 양(정답)','A 미간선','B 수직선','C 거울 겹치기','D 3D 보정'].forEach(x=>{const th=document.createElement('th'); th.textContent=x; h.appendChild(th);});
+    const b=t.createTBody(); const errs={A:[],B:[],C:[],D:[]};
+    for(const mmShift of [1,2,3]){
+      const cv=warpChin(lastNormalFrame, base.P[IDX.chin], base.A.fwPx*0.35, mmShift/base.mmpp);
+      const r=analyzeImage(cv); const tr=b.insertRow(); const c0=tr.insertCell(); c0.textContent=mmShift+'mm'; c0.className='lbl';
+      for(const k of METHODS){
+        const c=tr.insertCell(); if(!r){ c.textContent='—'; continue; }
+        const got=(r[k].chin*r[k].fwPx-base[k].chin*base[k].fwPx)/100*base.mmpp;
+        errs[k].push(Math.abs(got-mmShift)); c.textContent=got.toFixed(2)+'mm';
+      }
+    }
+    const err={}; for(const k of METHODS) err[k]=errs[k].length?mean(errs[k]):null;
+    const cap=t.createCaption(); cap.className='note';
+    cap.textContent=`정답에 가까울수록 정확해요. 평균 오차: `+METHODS.map(k=>`${k} ${err[k]!=null?err[k].toFixed(2):'—'}mm`).join(', ')+`. B·C는 턱 근처 점도 중심선 계산에 쓰여서, 턱이 움직이면 중심선도 조금 따라가 값이 작게 나올 수 있어요.`;
+    const w=document.createElement('div'); w.className='tablewrap'; w.appendChild(t);
+    note.textContent=`${new Date().toLocaleString('ko-KR')} · 1px = ${base.mmpp.toFixed(3)}mm (홍채 기준). 턱끝 주변만 부드럽게 옮긴 사진으로 시험했어요.`;
+    box.appendChild(w);
+    store.truth.push({t:new Date().toISOString(),day:dayNum(),mmpp:base.mmpp,err}); save();
+    renderToday(); renderSummary();
+  }catch(e){ note.textContent='시험 중 문제가 생겼어요: '+(e&&e.message||e); }
+  finally{ $('btnTruth').disabled=!lastNormalFrame; }
+}
+$('btnTruth').onclick=runTruth;
+
+applyRing();
 renderAll();
+setInterval(()=>{ if(phase==='idle') renderToday(); }, 60000);
 </script>
 </body>
 </html>
