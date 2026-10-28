@@ -154,6 +154,7 @@ svg text{fill:var(--muted);font-family:var(--font-num);font-size:11px}
         <div class="note" id="weekGoal"></div>
       </div>
     </div>
+    <div class="confirm" id="emptyHint" hidden><span>기록이 하나도 없어요. 어제 측정했다면 다른 브라우저로 열린 거예요. 아래 "기록"에서 <b>CSV 불러오기</b>로 이어서 할 수 있어요.</span></div>
     <ol class="steps" id="steps"></ol>
     <button class="primary big" id="btnGo">오늘 측정 시작</button>
     <div class="memo" id="memoBox">
@@ -265,11 +266,14 @@ svg text{fill:var(--muted);font-family:var(--font-num);font-size:11px}
       <h2>기록</h2>
       <div class="row">
         <button id="btnCsv">CSV로 저장</button>
+        <button id="btnImport">CSV 불러오기</button>
+        <input type="file" id="fileImport" accept=".csv,text/csv,text/plain" hidden>
         <button id="btnCsvAll">모든 사람 CSV</button>
         <button class="danger" id="btnClear">기록 지우기</button>
       </div>
     </div>
-    <div class="note">주말마다 CSV로 저장해서 Claude에게 보내 주세요. 기록은 이 브라우저에만 있어요.</div>
+    <div class="note">기록은 이 브라우저에만 있어요. 측정이 끝나면 CSV로 저장해 두세요. 다른 브라우저나 폰으로 옮길 때는 그 CSV를 "CSV 불러오기"로 넣으면 이어져요.</div>
+    <div class="note" id="importMsg"></div>
     <div id="clearConfirm" hidden class="confirm">
       <span id="clearText">이 사람의 기록, 메모, 개인 정면을 지울까요? 되돌릴 수 없어요.</span>
       <button class="danger" id="btnClearYes">지우기</button>
@@ -677,6 +681,70 @@ function expSummary(records, truth){
   return out;
 }
 
+// ---------- CSV 불러오기 (다른 브라우저로 옮기기·복구) ----------
+function csvParse(text){
+  text=text.replace(/^﻿/,''); const rows=[]; let row=[], f='', q=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(q){ if(c==='"'){ if(text[i+1]==='"'){ f+='"'; i++; } else q=false; } else f+=c; }
+    else if(c==='"') q=true;
+    else if(c===','){ row.push(f); f=''; }
+    else if(c==='\n'||c==='\r'){ if(c==='\r'&&text[i+1]==='\n') i++; row.push(f); rows.push(row); row=[]; f=''; }
+    else f+=c;
+  }
+  if(f!==''||row.length){ row.push(f); rows.push(row); }
+  const head=rows.shift()||[];
+  return rows.filter(r=>r.length>1).map(r=>{ const o={}; head.forEach((h,i)=>o[h]=r[i]??''); return o; });
+}
+// CSV → 사람별 {records, truth, frontChecks, days}. 얼굴 너비(px)가 없는 옛 CSV는 E 계산값으로 근사(restored 표시)
+function importFromCsv(text){
+  const rows=csvParse(text), num=v=>{ if(v==null||v==='') return null; const x=+v; return isFinite(x)?x:null; };
+  const SETS=[['A','m','sd'],['B','mB','sdB'],['C','mC','sdC'],['D','mD','sdD'],['E','mE','sdE']];
+  const keys=METRICS.map(d=>d.k), EF=['eye','mouth','chin','nose','width','fwPx'], out={};
+  for(const o of rows){
+    const name=o['사람']||'나', P=out[name]=out[name]||{name, mode:o['실험종류']==='1회'?'guest':'study', records:[], truth:[], frontChecks:[], days:{}};
+    const kind=o['종류'], t=o['시간']; if(!t) continue;
+    const front=num(o['정면_좌우'])!=null?{yaw:num(o['정면_좌우']),pitch:num(o['정면_위아래']),roll:num(o['정면_기울기']),spreadYaw:num(o['정면3회_좌우차이']),spreadPitch:num(o['정면3회_위아래차이']),deg:num(o['정면오차_도'])}:null;
+    if(kind==='정답시험'){
+      const g=p=>{ const x={}; let any=false; for(const M of METHODS){ x[M]=num(o[p+M]); if(x[M]!=null) any=true; } return any?x:null; };
+      P.truth.push({t, day:num(o['실험일차']), mmpp:num(o['mm_per_px']), err:g('정답오차_')||{}, flip:g('뒤집기_'), gain:g('감도_'), restored:true});
+      continue;
+    }
+    if(kind==='정면확인'){
+      const m=/좌우차이 (-?[\d.]+) 위아래차이 (-?[\d.]+)/.exec(o['조건']||'');
+      if(m&&front) P.frontChecks.push({yaw:front.yaw+(+m[1]), pitch:front.pitch+(+m[2]), roll:0, t, day:num(o['실험일차']), dYaw:+m[1], dPitch:+m[2], restored:true});
+      continue;
+    }
+    const ef={}; for(const f of ['f06','f10']){ ef[f]={}; for(const k of EF) ef[f][k]=num(o['E'+f+'_'+k]); }
+    const approxFw=ef.f06.fwPx!=null&&ef.f10.fwPx!=null?(ef.f06.fwPx+ef.f10.fwPx)/2:null;
+    const rec={id:Date.parse(t), v:5, t, day:num(o['실험일차']), kind:kind==='이전버전'?undefined:kind, tag:o['조건']||'', prep:o['흑백보정']==='1', repeatId:o['반복ID']||null,
+      cam:o['카메라']||'user', mmpp:num(o['mm_per_px']), level:num(o['폰기울기']), n:null, img:'', person:name, restored:true,
+      cond:{yaw:num(o.yaw),pitch:num(o.pitch),roll:num(o.roll),size:num(o.size),light:num(o['조명_좌우']),lightMean:num(o['조명_밝기'])},
+      eF:ef.f06.eye!=null?ef:null};
+    if(front) rec.front=front;
+    for(const [n,mk,sk] of SETS){
+      if(num(o[n+'_eye'])==null){ rec[mk]=null; rec[sk]=null; continue; }
+      const m={}, s={}; for(const k of keys){ m[k]=num(o[n+'_'+k]); s[k]=num(o[n+'_'+k+'_sd']); }
+      m.fwPx=num(o[n+'_fwPx'])??approxFw; rec[mk]=m; rec[sk]=s;
+    }
+    P.records.push(rec);
+    const dk=dayKey(t), sl=num(o['잠']);
+    if(sl!=null||o['술']||o['짠음식']||o['메모']) P.days[dk]={sleep:sl, alcohol:o['술']==='1', salty:o['짠음식']==='1', note:o['메모']||'', t};
+  }
+  return out;
+}
+// 이미 있는 기록과 합치기 (같은 시간·종류는 건너뜀). 추가된 개수 반환
+function mergeImported(profile, imp){
+  const has=new Set(profile.records.map(r=>r.t+'|'+r.kind)), hasT=new Set(profile.truth.map(x=>x.t)), hasC=new Set((profile.frontChecks||[]).map(x=>x.t));
+  let n=0;
+  for(const r of imp.records) if(!has.has(r.t+'|'+r.kind)){ profile.records.push(r); n++; }
+  for(const x of imp.truth) if(!hasT.has(x.t)){ profile.truth.push(x); n++; }
+  profile.frontChecks=profile.frontChecks||[];
+  for(const x of imp.frontChecks) if(!hasC.has(x.t)){ profile.frontChecks.push(x); n++; }
+  for(const [k,v] of Object.entries(imp.days)) if(!profile.days[k]) profile.days[k]=v;
+  profile.records.sort((a,b)=>a.t<b.t?-1:1); profile.truth.sort((a,b)=>a.t<b.t?-1:1);
+  return n;
+}
 // CORE-END
 </script>
 
@@ -1357,7 +1425,7 @@ function renderRef(){
   if(store.front){ const fu=frontUncertainty(store.front, store.frontChecks); tag.className='tag '+(fu.basis!=='measured'||fu.deg<=2?'ok':'warn'); tag.textContent=`${store.name}의 정면 등록됨 · 좌우 ${store.front.yaw.toFixed(1)}° 위아래 ${store.front.pitch.toFixed(1)}° · 오차 ±${fu.deg.toFixed(1)}°`; }
   else { tag.className='tag warn'; tag.textContent='개인 정면 미등록 (측정 시작 때 먼저 해요)'; }
 }
-function renderAll(){ renderPeople(); renderToday(); renderLatest(); renderSummary(); renderTrend(); renderHist(); renderRef(); }
+function renderAll(){ const eh=$('emptyHint'); if(eh) eh.hidden=Object.values(db.profiles).some(p=>p.records.length); renderPeople(); renderToday(); renderLatest(); renderSummary(); renderTrend(); renderHist(); renderRef(); }
 
 $('btnResetRef').onclick=()=>{ if(store.front){ store.frontHistory=store.frontHistory||[]; store.frontHistory.push({...store.front, checks:store.frontChecks, ended:new Date().toISOString()}); } store.ref=null; store.front=null; store.frontChecks=[]; save(); renderAll(); };
 $('btnClear').onclick=()=>{ $('clearConfirm').hidden=false; };
@@ -1415,6 +1483,7 @@ function csvFor(profiles){
   const head=['사람','실험종류','정면_좌우','정면_위아래','정면_기울기','정면3회_좌우차이','정면3회_위아래차이','정면오차_도','시간','날짜','실험일차','종류','조건','흑백보정','반복ID','카메라','mm_per_px','폰기울기','yaw','pitch','roll','size','조명_좌우','조명_밝기','잠','술','짠음식','메모'];
   const sets=[['A','m','sd'],['B','mB','sdB'],['C','mC','sdC'],['D','mD','sdD'],['E','mE','sdE']];
   for(const [n] of sets) for(const k of keys) head.push(n+'_'+k, n+'_'+k+'_sd');
+  for(const [n] of sets) head.push(n+'_fwPx');
   const EF=['eye','mouth','chin','nose','width','fwPx'];
   for(const f of ['f06','f10']) for(const k of EF) head.push('E'+f+'_'+k);
   head.push(...METHODS.map(M=>'정답오차_'+M), ...METHODS.map(M=>'뒤집기_'+M), ...METHODS.map(M=>'감도_'+M));
@@ -1426,9 +1495,10 @@ function csvFor(profiles){
     const frontAt=t=>{ for(const h of (p.frontHistory||[])) if(t>=h.t&&t<h.ended) return h; return p.front&&t>=p.front.t?p.front:null; };
     for(const r of p.records){
       const dk=dayKey(r.t), memo=p.days[dk]||{};
-      const F=frontAt(r.t)||r.front, pre=F?[p.name,p.mode==='guest'?'1회':'4주',n2(F.yaw),n2(F.pitch),n2(F.roll),n2(F.spreadYaw),n2(F.spreadPitch),F.tries?frontUncertainty(F,F.checks||(F===p.front?p.frontChecks:[])).deg.toFixed(2):'']:pre0;
+      const F=frontAt(r.t)||r.front, pre=F?[p.name,p.mode==='guest'?'1회':'4주',n2(F.yaw),n2(F.pitch),n2(F.roll),n2(F.spreadYaw),n2(F.spreadPitch),F.tries?frontUncertainty(F,F.checks||(F===p.front?p.frontChecks:[])).deg.toFixed(2):n2(F.deg)]:pre0;
       const row=[...pre,r.t,dk,r.day??'',r.kind||'이전버전',r.tag||'',r.prep?1:0,r.repeatId||'',r.cam,r.mmpp?r.mmpp.toFixed(5):'',r.level??'',r.cond.yaw,r.cond.pitch,r.cond.roll,r.cond.size,r.cond.light,r.cond.lightMean??'',memo.sleep??'',memo.alcohol?1:'',memo.salty?1:'',memo.note||''];
       for(const [,mk,sk] of sets) for(const k of keys){ const m=r[mk], sdv=r[sk]; row.push(m&&m[k]!=null?m[k].toFixed(4):'', sdv&&sdv[k]!=null?sdv[k].toFixed(4):''); }
+      for(const [,mk] of sets){ const m=r[mk]; row.push(m&&m.fwPx!=null?m.fwPx.toFixed(2):''); }
       for(const f of ['f06','f10']) for(const k of EF){ const v=r.eF&&r.eF[f]?r.eF[f][k]:null; row.push(v!=null?v.toFixed(4):''); }
       for(let i=0;i<TAIL;i++) row.push('');
       rows.push(row.map(csvq).join(','));
@@ -1453,6 +1523,21 @@ function download(text, name){
   setTimeout(()=>URL.revokeObjectURL(a.href),2000);
 }
 $('btnCsv').onclick=()=>download(csvFor([store]),`얼굴수평계_${store.name}_${today()}.csv`);
+$('btnImport').onclick=()=>$('fileImport').click();
+$('fileImport').onchange=async e=>{
+  const f=e.target.files[0]; e.target.value=''; if(!f) return;
+  try{
+    const imp=importFromCsv(await f.text()); let added=0, people=[];
+    for(const [name,P] of Object.entries(imp)){
+      let id=Object.keys(db.profiles).find(k=>db.profiles[k].name===name);
+      if(!id){ id='p'+Date.now()+Math.floor(Math.random()*1000); db.profiles[id]=normProfile({created:P.records[0]?.t, consent:true},name,P.mode); }
+      added+=mergeImported(db.profiles[id],P); people.push(name);
+    }
+    save(); renderAll();
+    $('importMsg').textContent=`불러오기 완료: ${people.join(', ')} · 새로 추가 ${added}개 (이미 있던 건 건너뜀). 옛 CSV에서 온 mm 값은 약간의 근사가 있어요.`;
+  }catch(err){ $('importMsg').textContent='불러오지 못했어요: '+(err&&err.message||err); }
+};
+try{ navigator.storage&&navigator.storage.persist&&navigator.storage.persist(); }catch(e){}
 $('btnCsvAll').onclick=()=>download(csvFor(Object.values(db.profiles)),`얼굴수평계_모든사람_${today()}.csv`);
 
 // ---------- 정답 시험 ----------
