@@ -717,7 +717,7 @@ function importFromCsv(text){
     }
     const ef={}; for(const f of ['f06','f10']){ ef[f]={}; for(const k of EF) ef[f][k]=num(o['E'+f+'_'+k]); }
     const approxFw=ef.f06.fwPx!=null&&ef.f10.fwPx!=null?(ef.f06.fwPx+ef.f10.fwPx)/2:null;
-    const rec={id:Date.parse(t), v:5, t, day:num(o['실험일차']), kind:kind==='이전버전'?undefined:kind, tag:o['조건']||'', prep:o['흑백보정']==='1', repeatId:o['반복ID']||null,
+    const rec={id:Date.parse(t), v:5, fwFix:1, t, day:num(o['실험일차']), kind:kind==='이전버전'?undefined:kind, tag:o['조건']||'', prep:o['흑백보정']==='1', repeatId:o['반복ID']||null,
       cam:o['카메라']||'user', mmpp:num(o['mm_per_px']), level:num(o['폰기울기']), n:null, img:'', person:name, restored:true,
       cond:{yaw:num(o.yaw),pitch:num(o.pitch),roll:num(o.roll),size:num(o.size),light:num(o['조명_좌우']),lightMean:num(o['조명_밝기'])},
       eF:ef.f06.eye!=null?ef:null};
@@ -725,7 +725,8 @@ function importFromCsv(text){
     for(const [n,mk,sk] of SETS){
       if(num(o[n+'_eye'])==null){ rec[mk]=null; rec[sk]=null; continue; }
       const m={}, s={}; for(const k of keys){ m[k]=num(o[n+'_'+k]); s[k]=num(o[n+'_'+k+'_sd']); }
-      m.fwPx=num(o[n+'_fwPx'])??approxFw; rec[mk]=m; rec[sk]=s;
+      // 옛 CSV 근사: 2D 얼굴 너비 = E평균×0.879, E 너비 = ×0.993 (10/28 실측 비율, 흔들림 0.3%)
+      m.fwPx=num(o[n+'_fwPx'])??(approxFw!=null?approxFw*(n==='E'?0.993:0.879):null); rec[mk]=m; rec[sk]=s;
     }
     P.records.push(rec);
     const dk=dayKey(t), sl=num(o['잠']);
@@ -775,7 +776,13 @@ function loadDB(){
   d.showM=d.showM||'D';
   return d;
 }
-let db=loadDB(), store=db.profiles[db.cur];
+let db=loadDB(); fixRestoredFw(db); let store=db.profiles[db.cur];
+function fixRestoredFw(d){
+  for(const p of Object.values(d.profiles)) for(const r of p.records) if(r.restored&&!r.fwFix){
+    for(const mk of ['m','mB','mC','mD']) if(r[mk]&&r[mk].fwPx) r[mk].fwPx*=0.879;
+    if(r.mE&&r.mE.fwPx) r.mE.fwPx*=0.993; r.fwFix=1;
+  }
+}
 function save(){ try{ localStorage.setItem(DBKEY, JSON.stringify(db)); }catch(e){ setMsg('저장 공간이 부족해요. CSV로 저장한 뒤 오래된 기록이나 사람을 지워 주세요.'); } }
 
 // ---------- 상태 ----------
