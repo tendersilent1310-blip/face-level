@@ -44,6 +44,20 @@ h2{font-size:15px;margin:0;font-weight:600}
 .stage .step-badge{position:absolute;left:12px;top:12px;background:rgba(0,0,0,.6);color:#fff;font-size:13px;font-weight:600;padding:5px 10px;border-radius:999px}
 .stage .start{position:absolute;inset:0;display:grid;place-items:center;align-content:center;gap:10px;color:#fff;text-align:center;padding:20px}
 .ring{position:absolute;top:12px;right:12px;width:54px;height:54px}
+.hud{position:absolute;left:50%;top:10px;transform:translateX(-50%);display:grid;grid-template-columns:auto auto;align-items:center;gap:10px;max-width:calc(100% - 140px);padding:8px 14px 8px 10px;border-radius:14px;background:rgba(0,0,0,.66);color:#fff;pointer-events:none}
+.hud.good{background:rgba(14,138,105,.85)}
+.hud svg{width:44px;height:44px;display:block}
+.hud .ht{font-size:18px;font-weight:700;line-height:1.25}
+.hud .hs{font-size:12.5px;opacity:.85;font-weight:500}
+.hud .g{position:relative;background:rgba(255,255,255,.25);border-radius:4px;margin-top:5px}
+.hud .g.h{height:8px;width:150px;max-width:100%}
+.hud .g .z{position:absolute;top:0;bottom:0;background:rgba(60,199,156,.9);border-radius:4px}
+.hud .g .b{position:absolute;top:-3px;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 0 0 2px #EE5A50;transform:translateX(-50%);transition:left .08s linear}
+.hud .g .b.ok{box-shadow:0 0 0 2px #3CC79C}
+.chips{display:flex;flex-wrap:wrap;justify-content:center;gap:5px;margin-top:8px}
+.chips span{font-size:12.5px;font-weight:600;padding:3px 9px;border-radius:999px;background:var(--ok-soft);color:var(--ok)}
+.chips span.bad{background:var(--bad);color:#fff}
+@media (max-width:480px){ .hud{max-width:calc(100% - 16px);width:max-content;top:46px;padding:6px 12px 7px 8px;gap:8px} .hud .ht{font-size:15.5px} .hud .hs{font-size:11.5px} .hud svg{width:34px;height:34px} .hud .g.h{width:120px} }
 .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 button,select,input{font:inherit;color:inherit}
 button{border:1px solid var(--line);background:var(--panel);border-radius:9px;padding:8px 13px;cursor:pointer;font-weight:500}
@@ -156,6 +170,7 @@ svg text{fill:var(--muted);font-family:var(--font-num);font-size:11px}
     </div>
     <div class="confirm" id="emptyHint" hidden><span>기록이 하나도 없어요. 어제 측정했다면 다른 브라우저로 열린 거예요. 아래 "기록"에서 <b>CSV 불러오기</b>로 이어서 할 수 있어요.</span></div>
     <ol class="steps" id="steps"></ol>
+    <div class="note" id="coach"></div>
     <button class="primary big" id="btnGo">오늘 측정 시작</button>
     <div class="memo" id="memoBox">
       <div class="row" style="justify-content:space-between"><b>한 줄 메모</b><span class="sub" id="memoState"></span></div>
@@ -187,8 +202,10 @@ svg text{fill:var(--muted);font-family:var(--font-num);font-size:11px}
             <div style="font-size:17px;font-weight:600">위의 "오늘 측정 시작"을 누르면 카메라가 켜져요</div>
             <div style="font-size:13px;opacity:.8">사진은 이 기기 안에서만 분석하고, 어디로도 보내지 않아요.</div>
           </div>
+          <div class="hud" id="hud" hidden aria-live="polite"><div id="hudIcon"></div><div><div class="ht" id="hudText"></div><div class="hs" id="hudSub"></div><div id="hudGauge"></div></div></div>
           <div class="msg" id="msg" hidden></div>
         </div>
+        <div class="chips" id="chips" hidden></div>
       </div>
       <div class="row">
         <label class="sub" for="camSel">카메라</label>
@@ -206,6 +223,8 @@ svg text{fill:var(--muted);font-family:var(--font-num);font-size:11px}
           <li><b>거리:</b> 의자에 등을 붙이고 앉아 <b>팔을 쭉 뻗어 손끝이 폰에 닿는 거리</b>(약 60cm). 폰 자리를 테이프로 표시해 두면 매일 똑같아요.</li>
           <li><b>높이:</b> 카메라가 눈높이쯤 오게 해요.</li>
           <li><b>개인 정면 등록 (처음 한 번):</b> 편하게 앉아 폰 위쪽 <b>카메라 렌즈</b>를 3초 바라보면, 그 자세가 나만의 정면이 돼요. 억지로 똑바로 하지 말고 평소처럼요.</li>
+          <li><b>화면 위 화살표 따라 하기:</b> 렌즈 바로 아래에 <b>지금 고칠 한 가지</b>가 큰 화살표로 나와요. 화살표 쪽으로 움직이면 아래 막대의 흰 점이 초록 칸으로 들어가요. 점이 안 움직이면 앱이 아직 못 알아챈 거예요.</li>
+          <li><b>아래 칩:</b> 위치·거리·좌우·위아래·기울기가 초록이면 통과, 빨강이면 그 항목이 문제예요.</li>
           <li><b>소리 따라 하기:</b> 코에서 나온 <b style="color:var(--bad)">빨간 점</b>을 <b style="color:var(--ok)">초록 원</b>에 넣으면 돼요. 실험 측정 때는 초록 원이 옆으로 옮겨가요.</li>
           <li><b>조명:</b> 따로 맞추지 않아도 돼요. 앱이 밝기만 기록해요. 셀카 모드에서는 화면 테두리가 하얗게 빛나서 조명 역할을 해요(폰 밝기를 올리면 더 좋아요).</li>
         </ol>
@@ -789,7 +808,7 @@ function save(){ try{ localStorage.setItem(DBKEY, JSON.stringify(db)); }catch(e)
 let landmarker=null, FL=null, files=null, imgLandmarker=null, stream=null, running=false, lastVideoTime=-1;
 let phase='idle', holdStart=0, burst=[], burstFails=0, rearmAt=0;
 let session=null;                 // {queue:[...], i}
-let reg=null, layoutVotes={}, history=[], lastSpoken='', lastSpokenAt=0, tilt={v:null,t:0}, lastNormalFrame=null;
+let reg=null, layoutVotes={}, history=[], smHist=[], hyst={}, hystKey='', lastSpoken='', lastSpokenAt=0, tilt={v:null,t:0}, lastNormalFrame=null;
 const lightCanvas=document.createElement('canvas'); lightCanvas.width=160; lightCanvas.height=120;
 const lctx=lightCanvas.getContext('2d',{willReadFrequently:true});
 const proc=document.createElement('canvas'), pctx=proc.getContext('2d',{willReadFrequently:true});
@@ -890,6 +909,7 @@ function renderToday(){
     go.classList.add('primary');
     go.textContent= q.length ? `${todayCount('normal')||todayCount('repeat')||todayCount('cond')?'이어서 하기':'오늘 측정 시작'} · ${q.length}회, 약 ${Math.max(1,Math.round(q.length*12/60))}분` : '오늘 측정 끝! 추가 측정 1회';
   }
+  $('coach').textContent=store.coach&&dayKey(store.coach.t)===today()?store.coach.text:'';
   const m=store.days[today()];
   $('memoState').textContent=m?'저장됨':'';
   if(m && document.activeElement?.closest?.('#memoBox')==null){ $('mSleep').value=m.sleep??''; $('mAlc').checked=!!m.alcohol; $('mSalt').checked=!!m.salty; $('mNote').value=m.note||''; }
@@ -976,16 +996,28 @@ function nextItem(){
   phase='rest'; rearmAt=performance.now()+(changed?3500:1800); holdStart=0;
   if(changed) announce(item,false); else { $('stepBadge').textContent=`${item.label} · ${session.i+1}/${session.queue.length}`; }
 }
+const COACH={pos:'폰과 의자 자리를 테이프로 표시해 두면 매번 같은 자리에 와요',dist:'팔을 쭉 뻗어 손끝이 폰에 닿는 거리로 앉아요',
+  yaw:'코끝이 폰 정중앙을 향하게 해요',pitch:'폰 카메라를 눈높이에 두면 턱 각도가 쉽게 맞아요',roll:'양쪽 어깨 높이를 맞추고 고개를 세워요',
+  level:'폰을 거치대나 책에 기대 세워요',gaze:'화면 말고 위쪽 카메라 구멍을 봐요',expr:'입을 가볍게 다물고 얼굴 힘을 빼요',still:'찍는 2초 동안 숨을 참듯이 멈춰요',face:'얼굴 전체가 화면에 들어오게 해요'};
+function coachText(sess){
+  const f=sess&&sess.fails||{}, tot=sess&&sess.aimFrames||0;
+  const top=Object.entries(f).sort((a,b)=>b[1]-a[1]).slice(0,2).filter(([,n])=>tot&&n/tot>=0.08);
+  if(!tot) return '';
+  if(!top.length) return '오늘은 자세 맞추기가 거의 바로 됐어요. 👍';
+  return '오늘 맞추는 데 시간이 가장 오래 걸린 것: '+top.map(([k,n])=>`${CHIP[k]||k} ${Math.round(n/tot*100)}%`).join(', ')+
+    (sess.restarts?` · 찍다가 다시 맞춘 횟수 ${sess.restarts}번`:'')+'. 팁: '+COACH[top[0][0]];
+}
 async function endSession(finished){
+  const sess=session; if(sess){ const c=coachText(sess); if(c){ store.coach={t:new Date().toISOString(), text:c}; save(); } }
+  renderHud(null,[],false);
   phase='idle'; session=null; reg=null; setRing(0); $('stepBadge').hidden=true; renderPeople();
   renderToday();
   if(!finished){ setMsg('멈췄어요. 이어서 하려면 위의 버튼을 누르세요.'); return; }
   const plan=planFor(dayNum(),store.mode);
   const needTruth=plan.steps.some(s=>s.k==='truth') && !store.truth.some(x=>dayKey(x.t)===today());
   if(needTruth&&lastNormalFrame){ setMsg('측정 끝! 정답 시험을 하는 중이에요…'); await runTruth(); }
-  const memoNeeded=!store.days[today()];
-  setMsg(memoNeeded?'오늘 측정 끝! 위에 한 줄 메모만 남기면 돼요.':'오늘 측정 끝! 수고했어요.');
-  speak(memoNeeded?'오늘 측정 끝. 한 줄 메모만 남기면 돼요':'오늘 측정 끝. 수고했어요',true);
+  setMsg('오늘 측정 끝! 수고했어요. CSV로 저장해 두세요.');
+  speak('오늘 측정 끝. 수고했어요',true);
   renderToday(); renderSummary();
 }
 
@@ -1021,7 +1053,7 @@ function cheekLight(P){
 }
 function evaluate(res){
   const W=video.videoWidth,H=video.videoHeight;
-  if(!res.faceLandmarks||!res.faceLandmarks.length) return {face:false};
+  if(!res.faceLandmarks||!res.faceLandmarks.length){ smHist=[]; return {face:false}; }
   const L=res.faceLandmarks[0], P=L.map(p=>({x:p.x*W,y:p.y*H}));
   const d=res.facialTransformationMatrixes&&res.facialTransformationMatrixes[0]?res.facialTransformationMatrixes[0].data:null;
   const opts=['col+','row+','col-','row-'];
@@ -1049,7 +1081,10 @@ function evaluate(res){
   if(history.length>8) history.shift();
   const rng=k=>Math.max(...history.map(h=>h[k]))-Math.min(...history.map(h=>h[k]));
   const motion=history.length<8?1:Math.max(rng('x'),rng('y'),rng('cx'),rng('cy'))/m.fwPx;
-  return {face:true,P,pose,m,frame,bs,size,cx,cy,light,motion,gaze:gazeOffset(P),raw:{L,W,H}};
+  // 안내용 값은 최근 5프레임 중간값으로 (한 프레임 튀는 값 때문에 안내가 깜빡이지 않게). 측정값은 그대로 사용
+  smHist.push({yaw:pose.yaw,pitch:pose.pitch,roll:pose.roll,cx,cy,size}); if(smHist.length>5) smHist.shift();
+  const sm={}; for(const k of ['yaw','pitch','roll','cx','cy','size']) sm[k]=median(smHist.map(h=>h[k]));
+  return {face:true,P,pose,m,frame,bs,size,cx,cy,light,motion,gaze:gazeOffset(P),raw:{L,W,H},sm};
 }
 
 const TOL={level:2, dist:7, pos:0.08, posFirst:0.13, yaw:4, pitch:4, pitchFirst:8, roll:3, motion:0.015, aim:1.5};
@@ -1059,6 +1094,7 @@ function goalAngles(T){
 }
 function checksFor(s,T){
   T=T||{};
+  const S=s.sm||(s.face?{yaw:s.pose.yaw,pitch:s.pose.pitch,roll:s.pose.roll,cx:s.cx,cy:s.cy,size:s.size}:{});
   const ref=store.ref, list=[], mirror=$('camSel').value==='user';
   const add=(key,name,ok,val,hint,level,info)=>list.push({key,name,ok,val,hint,level,info});
   if(!s.face){ add('face','얼굴 찾기',false,'—','얼굴이 화면에 다 보이게 해 주세요'); return list; }
@@ -1066,10 +1102,10 @@ function checksFor(s,T){
   if(T.front){
     const hasT=tilt.v!=null && performance.now()-tilt.t<1500;
     if(hasT) add('level','폰 수평',Math.abs(tilt.v)<=TOL.level,`${tilt.v.toFixed(1)}°`,'폰을 좌우로 기울지 않게 똑바로 세워 주세요',{v:tilt.v,lim:TOL.level,span:10});
-    const okPx=s.m.fwPx>=160, okBig=s.size<=0.55;
+    const okPx=s.m.fwPx>=160, okBig=S.size<=0.55;
     add('dist','거리',okPx&&okBig,`${Math.round(s.m.fwPx)}px`, !okPx?'너무 멀어요. 조금 앞으로 오세요':!okBig?'너무 가까워요. 조금 뒤로 가세요':'좋아요. 이 거리가 기준이 돼요');
-    const dx=s.cx-0.5, dy=s.cy-0.45;
-    add('pos','화면 위치',Math.abs(dx)<=TOL.posFirst&&Math.abs(dy)<=TOL.posFirst,`${(Math.hypot(dx,dy)*100).toFixed(1)}%`,'얼굴이 화면 가운데쯤 오게 해 주세요');
+    const dx=S.cx-0.5, dy=S.cy-0.45;
+    add('pos','화면 위치',Math.abs(dx)<=TOL.posFirst&&Math.abs(dy)<=TOL.posFirst,`${(Math.hypot(dx,dy)*100).toFixed(1)}%`,'얼굴이 화면 가운데쯤 오게 해 주세요'); list[list.length-1].hy={v:Math.max(Math.abs(dx),Math.abs(dy)),lim:TOL.posFirst,dx,dy};
     const gz=s.gaze, gok=gz&&gz.x<=0.10&&Math.abs(gz.y)<=0.22;
     add('gaze','렌즈 바라보기',!!gok,gz?`${Math.round(gz.x*100)}`:'—','화면 말고 폰 위쪽의 카메라 렌즈를 바라보세요');
     const smile=Math.max(s.bs.mouthSmileLeft||0,s.bs.mouthSmileRight||0), jaw=s.bs.jawOpen||0, blink=Math.max(s.bs.eyeBlinkLeft||0,s.bs.eyeBlinkRight||0);
@@ -1081,34 +1117,36 @@ function checksFor(s,T){
   if(hasTilt) add('level','폰 수평',Math.abs(tilt.v)<=TOL.level,`${tilt.v.toFixed(1)}°`,'폰을 좌우로 기울지 않게 똑바로 세워 주세요',{v:tilt.v,lim:TOL.level,span:10});
   // 거리
   if(ref){
-    const goal=T.size||1, r=s.size/(ref.size*goal), lim=T.size?0.04:TOL.dist/100;
+    const goal=T.size||1, r=S.size/(ref.size*goal), lim=T.size?0.04:TOL.dist/100;
     add('dist',T.size?`목표 거리 (${T.size>1?'더 가까이':'더 멀리'})`:'거리 (기준과 같게)',Math.abs(r-1)<=lim,`${((r-1)*100).toFixed(1)}%`,
       r<1-lim?(r<0.85?'한 뼘 정도 앞으로 오세요':'조금만 앞으로 오세요'):r>1+lim?(r>1.15?'한 뼘 정도 뒤로 가세요':'조금만 뒤로 가세요'):'',
       {v:(r-1)*100,lim:lim*100,span:25});
   }else{
-    const okPx=s.m.fwPx>=160, okBig=s.size<=0.55;
+    const okPx=s.m.fwPx>=160, okBig=S.size<=0.55;
     add('dist','거리',okPx&&okBig,`${Math.round(s.m.fwPx)}px`, !okPx?'너무 멀어요. 조금 앞으로 오세요':!okBig?'너무 가까워요. 조금 뒤로 가세요':'좋아요. 이 거리가 기준이 돼요');
   }
   // 위치
   const tx=ref?ref.cx:0.5, ty=ref?ref.cy:0.45, lim=ref?TOL.pos:TOL.posFirst;
-  const dx=s.cx-tx, dy=s.cy-ty, sdx=mirror?-dx:dx;
+  const dx=S.cx-tx, dy=S.cy-ty, sdx=mirror?-dx:dx;
   let ph='얼굴을 화면 가운데로 옮겨 주세요';
   if(mirror){ if(Math.abs(dx)>=Math.abs(dy)) ph= sdx<0?'몸을 오른쪽으로 조금 옮기세요':'몸을 왼쪽으로 조금 옮기세요';
     else ph= dy<0?'폰을 조금 위로 올리거나 몸을 낮추세요':'폰을 조금 아래로 내리거나 몸을 세우세요'; }
-  add('pos','화면 위치',Math.abs(dx)<=lim&&Math.abs(dy)<=lim,`${(Math.hypot(dx,dy)*100).toFixed(1)}%`, ph);
+  add('pos','화면 위치',Math.abs(dx)<=lim&&Math.abs(dy)<=lim,`${(Math.hypot(dx,dy)*100).toFixed(1)}%`, ph); list[list.length-1].hy={v:Math.max(Math.abs(dx),Math.abs(dy)),lim,dx,dy};
   // 정면 (레이저 점)
-  const g=goalAngles(T), ey=s.pose.yaw-g.yaw, ep=s.pose.pitch-g.pitch;
+  const g=goalAngles(T), ey=S.yaw-g.yaw, ep=S.pitch-g.pitch;
   const yl=T.yaw?TOL.aim:TOL.yaw, pl=T.pitch?TOL.aim:(ref?TOL.pitch:TOL.pitchFirst);
+  list.aim={ey,ep};
   add('yaw',T.yaw?`목표: 고개 ${T.yaw}° 돌리기`:'좌우 돌림',Math.abs(ey)<=yl,`${ey.toFixed(1)}°`,(ey>0?'고개를 오른쪽으로 살짝 돌리세요':'고개를 왼쪽으로 살짝 돌리세요')+' (빨간 점을 초록 원 안으로)',{v:ey,lim:yl,span:15});
   add('pitch',T.pitch?`목표: 턱 ${T.pitch<0?'들기':'당기기'}`:(ref?'위아래 (기준과 같게)':'위아래'),Math.abs(ep)<=pl,`${ep.toFixed(1)}°`,(ep>0?'턱을 살짝 드세요':'턱을 살짝 당기세요')+' (빨간 점을 초록 원 안으로)',{v:ep,lim:pl,span:15});
   // 기울기
-  const r0=ref&&ref.roll!=null?ref.roll:0, rr=s.pose.roll-r0;
+  const r0=ref&&ref.roll!=null?ref.roll:0, rr=S.roll-r0;
   if(T.roll){
     const e=Math.abs(rr)-T.roll;
-    add('roll',`목표: 고개 ${T.roll}° 기울이기`,Math.abs(e)<=TOL.aim,`${s.pose.roll.toFixed(1)}°`, e<0?'고개를 조금 더 기울이세요':'조금 덜 기울이세요',{v:e,lim:TOL.aim,span:8});
+    add('roll',`목표: 고개 ${T.roll}° 기울이기`,Math.abs(e)<=TOL.aim,`${S.roll.toFixed(1)}°`, e<0?'고개를 조금 더 기울이세요':'조금 덜 기울이세요',{v:e,lim:TOL.aim,span:8});
   }else{
     const rollHint= s.pose.eye>0?'고개를 오른쪽 어깨 쪽으로 살짝 기울이세요':'고개를 왼쪽 어깨 쪽으로 살짝 기울이세요';
     const rh= rr>0?'고개를 오른쪽 어깨 쪽으로 살짝 기울이세요':'고개를 왼쪽 어깨 쪽으로 살짝 기울이세요';
+    list.rr=rr;
     add('roll',ref?'옆으로 기울기 (내 정면과 같게)':'옆으로 기울기',Math.abs(rr)<=TOL.roll,`${rr.toFixed(1)}°`, (ref?rh:rollHint)+' (파란 선을 흰 선에)',{v:rr,lim:TOL.roll,span:12});
   }
   // 조명: 막지 않고 기록만
@@ -1120,6 +1158,74 @@ function checksFor(s,T){
   else add('expr','무표정',smile<0.25&&jaw<0.12&&blink<0.45,'', smile>=0.25?'웃음을 풀어 주세요':jaw>=0.12?'입을 다물어 주세요':blink>=0.45?'눈을 떠 주세요':'');
   add('still','멈춤',s.motion<TOL.motion,'', '잠깐 그대로 멈춰 주세요');
   return list;
+}
+// 히스테리시스: 통과하려면 허용 범위의 85% 안으로 들어와야 하고, 한번 통과하면 110%를 넘어야 다시 빨강.
+// → 가만히 있는데 안내가 떴다 사라졌다 하는 일을 줄이고, '움직이라'는 안내는 실제로 움직여야 풀린다
+function applyHyst(list, key){
+  if(key!==hystKey){ hyst={}; hystKey=key; }
+  for(const c of list){
+    const h=c.level||c.hy; if(!h||c.key==='light'||c.info) continue;
+    const a=Math.abs(h.v), ok=hyst[c.key]? a<=h.lim*1.1 : a<=h.lim*0.85;
+    c.ok=ok; hyst[c.key]=ok;
+  }
+}
+const CHIP={face:'얼굴',level:'폰 수평',dist:'거리',pos:'위치',yaw:'좌우',pitch:'위아래',roll:'기울기',gaze:'시선',expr:'표정',still:'멈춤',away:'고개 돌리기'};
+const SVGA=(deg)=>`<svg viewBox="0 0 44 44" aria-hidden="true"><g transform="rotate(${deg} 22 22)"><path d="M8 22h22" stroke="#fff" stroke-width="5" stroke-linecap="round"/><path d="M24 11l12 11-12 11" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></g></svg>`;
+const SVGI={
+  ok:'<svg viewBox="0 0 44 44" aria-hidden="true"><path d="M10 23l8 8 16-17" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  out:'<svg viewBox="0 0 44 44" aria-hidden="true"><g fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M17 17L7 7M7 15V7h8M27 27l10 10M37 29v8h-8M27 17L37 7M29 7h8v8M17 27L7 37M7 29v8h8"/></g></svg>',
+  inn:'<svg viewBox="0 0 44 44" aria-hidden="true"><g fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7l10 10M17 9v8H9M37 37L27 27M27 35v-8h8M37 7L27 17M27 9v8h8M7 37l10-10M9 27h8v8"/></g></svg>',
+  cw:'<svg viewBox="0 0 44 44" aria-hidden="true"><g fill="none" stroke="#fff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"><path d="M33 14A13 13 0 1 0 35 26"/><path d="M34 6v9h-9"/></g></svg>',
+  ccw:'<svg viewBox="0 0 44 44" aria-hidden="true"><g fill="none" stroke="#fff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 14A13 13 0 1 1 9 26"/><path d="M10 6v9h9"/></g></svg>',
+  lr:'<svg viewBox="0 0 44 44" aria-hidden="true"><g fill="none" stroke="#fff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 22h30M14 14l-8 8 8 8M30 14l8 8-8 8"/></g></svg>',
+  stop:'<svg viewBox="0 0 44 44" aria-hidden="true"><rect x="12" y="12" width="20" height="20" rx="4" fill="#fff"/></svg>',
+  eye:'<svg viewBox="0 0 44 44" aria-hidden="true"><path d="M4 22s7-11 18-11 18 11 18 11-7 11-18 11S4 22 4 22z" fill="none" stroke="#fff" stroke-width="3.5"/><circle cx="22" cy="22" r="5" fill="#fff"/></svg>',
+  warn:'<svg viewBox="0 0 44 44" aria-hidden="true"><path d="M22 6l17 31H5z" fill="none" stroke="#fff" stroke-width="4" stroke-linejoin="round"/><path d="M22 18v9" stroke="#fff" stroke-width="4" stroke-linecap="round"/><circle cx="22" cy="32" r="2.4" fill="#fff"/></svg>'
+};
+// 지금 고칠 한 가지를 화면 위(렌즈 바로 아래)에 화살표로. 화살표 = 움직일 방향(거울처럼 보이는 화면 기준)
+// 막대: 가운데 초록 칸이 목표, 흰 점이 지금. 움직이면 점이 따라 움직여서 '내가 제대로 움직이고 있는지' 바로 보인다
+function hudFor(s, list, T, extra){
+  const mirror=$('camSel').value==='user';
+  if(extra) return extra;
+  const bad=list.find(c=>!c.ok && !c.info);
+  if(!bad) return {icon:SVGI.ok, text:'좋아요, 그대로', sub:'', good:true};
+  const g=(v,lim,span)=>({v,lim,span});
+  switch(bad.key){
+    case 'face': return {icon:SVGI.warn,text:'얼굴이 다 보이게',sub:'화면 안으로 들어와 주세요'};
+    case 'pos': { const h=bad.hy, ddx=(mirror?-h.dx:h.dx), big=Math.abs(h.dx)>=Math.abs(h.dy);
+      // 화면에서 얼굴이 목표보다 오른쪽에 있으면 왼쪽으로 옮겨야 한다
+      const ang= big ? (ddx>0?180:0) : (h.dy>0?-90:90);
+      return {icon:SVGA(ang), text: big?'몸을 화살표 쪽으로':(h.dy>0?'폰을 조금 내리기':'폰을 조금 올리기'), sub:'얼굴 위치 맞추기', gauge:big?g(ddx*100,h.lim*100,h.lim*300):g(-h.dy*100,h.lim*100,h.lim*300)}; }
+    case 'dist': { const v=bad.level?bad.level.v:0, far=bad.level? v<0 : /멀어요/.test(bad.hint);
+      return {icon:far?SVGI.out:SVGI.inn, text:far?'조금 앞으로':'조금 뒤로', sub:bad.level?`기준 거리와 ${Math.abs(v).toFixed(0)}% 차이`:'', gauge:bad.level?g(v,bad.level.lim,bad.level.span):null}; }
+    case 'yaw': { const ey=list.aim.ey, dx=mirror?ey:-ey;
+      return {icon:SVGA(dx>0?0:180), text:`고개를 ${ey>0?'오른쪽':'왼쪽'}으로 살짝`, sub:`${Math.abs(ey).toFixed(1)}° 남음 · 빨간 점을 초록 원에`, gauge:g(-dx,bad.level.lim,bad.level.span)}; }
+    case 'pitch': { const ep=list.aim.ep;
+      return {icon:SVGA(ep>0?-90:90), text: ep>0?'턱을 살짝 들기':'턱을 살짝 당기기', sub:`${Math.abs(ep).toFixed(1)}° 남음`, gauge:g(ep,bad.level.lim,bad.level.span)}; }
+    case 'roll': { if(T&&T.roll){ const e=bad.level.v; return {icon:SVGI.cw, text:e<0?'조금 더 기울이기':'조금 덜 기울이기', sub:`목표 ${T.roll}°`, gauge:g(e,bad.level.lim,bad.level.span)}; }
+      const rr=list.rr??0, toRight=rr>0, cw=mirror?toRight:!toRight;
+      return {icon:cw?SVGI.cw:SVGI.ccw, text:`고개를 ${toRight?'오른쪽':'왼쪽'} 어깨 쪽으로`, sub:`${Math.abs(rr).toFixed(1)}° 기울어짐 · 파란 선을 흰 선에`, gauge:bad.level?g(mirror?rr:-rr,bad.level.lim,bad.level.span):null}; }
+    case 'level': return {icon:bad.level.v>0?SVGI.ccw:SVGI.cw, text:'폰을 똑바로 세우기', sub:`폰이 ${Math.abs(bad.level.v).toFixed(1)}° 기울어짐`, gauge:g(bad.level.v,bad.level.lim,bad.level.span)};
+    case 'gaze': return {icon:SVGA(-90), text:'위쪽 렌즈 보기', sub:'화면 말고 카메라 구멍을 봐요'};
+    case 'expr': return {icon:SVGI.warn, text:bad.hint||'무표정', sub:''};
+    case 'still': return {icon:SVGI.stop, text:'잠깐 멈춤', sub:'숨 한 번 참듯이'};
+  }
+  return {icon:SVGI.warn, text:bad.hint||bad.name, sub:''};
+}
+function renderHud(h, list, show){
+  const hud=$('hud'), chips=$('chips');
+  hud.hidden=!show; chips.hidden=!show; if(!show) return;
+  hud.classList.toggle('good', !!h.good);
+  $('hudIcon').innerHTML=h.icon; $('hudText').textContent=h.text; $('hudSub').textContent=h.sub||'';
+  const gb=$('hudGauge'); gb.innerHTML='';
+  if(h.gauge){
+    const {v,lim,span}=h.gauge, el=document.createElement('div'); el.className='g h';
+    const z=document.createElement('div'); z.className='z'; const half=Math.min(50,lim/span*50); z.style.left=(50-half)+'%'; z.style.width=(half*2)+'%';
+    const b=document.createElement('div'); b.className='b'+(Math.abs(v)<=lim?' ok':''); b.style.left=(50+Math.max(-1,Math.min(1,v/span))*50)+'%';
+    el.append(z,b); gb.appendChild(el);
+  }
+  chips.innerHTML='';
+  for(const c of list){ if(c.key==='light') continue; const sp=document.createElement('span'); sp.className=c.ok?'ok':'bad'; sp.textContent=(c.ok?'✓ ':'✕ ')+(CHIP[c.key]||c.name); chips.appendChild(sp); }
 }
 function renderChecks(list){
   const box=$('checks'); box.innerHTML='';
@@ -1188,10 +1294,25 @@ function setRing(frac){ $('ring').hidden=frac<=0; $('ringArc').setAttribute('str
 const HOLD=500;
 function step(res){
   const it=curItem(), T=it&&it.target;
-  const s=evaluate(res), list=checksFor(s,T), allOk=list.every(c=>c.ok);
+  const s=evaluate(res), list=checksFor(s,T);
+  applyHyst(list, it?it.kind+'|'+(it.tag||'')+'|'+(it.try||''):'idle');
+  // 정면 2·3번째: 실제로 고개를 옆으로 돌렸다가 돌아와야 진행 (안 돌리면 '다시 재기'가 아니라 '같은 걸 3번 복사'가 된다)
+  let away=null;
+  if(it&&it.kind==='front'&&it.try>1&&!it.awayDone&&phase==='aim'){
+    const base=frontTries[frontTries.length-1], d=s.face&&base?Math.abs(s.pose.yaw-base.yaw):0;
+    it.lost=s.face?0:(it.lost||0)+1;
+    if(d>=12||it.lost>=15){ it.awayDone=true; speak('좋아요. 이제 다시 편하게 렌즈를 바라보세요',true); }
+    else{
+      list.unshift({key:'away',name:'고개 돌리기',ok:false});
+      away={icon:SVGI.lr, text:'① 고개를 옆으로 크게 돌리기', sub:`${d.toFixed(0)}° / 12° · 다 돌리면 ② 렌즈를 다시 봐요`, gauge:{v:Math.min(12,d)-12,lim:1,span:12}};
+    }
+  }
+  const allOk=list.every(c=>c.ok);
   renderChecks(list); drawOverlay(s,allOk,T);
+  renderHud(hudFor(s,list,T,away), list, phase!=='idle'&&!!session);
   const now=performance.now();
   if(phase==='idle'){ setRing(0); return; }
+  if(phase==='aim'&&session){ session.aimFrames=(session.aimFrames||0)+1; if(!allOk){ const b=list.find(c=>!c.ok); if(b&&b.key!=='away'){ session.fails=session.fails||{}; session.fails[b.key]=(session.fails[b.key]||0)+1; } } }
   if(phase==='rest'){
     if(now>=rearmAt){ phase='aim'; holdStart=0; }
     else { setMsg(`다음 측정 준비… ${Math.ceil((rearmAt-now)/1000)}초`); return; }
@@ -1202,17 +1323,17 @@ function step(res){
       reg.f.push({yaw:s.pose.yaw,pitch:s.pose.pitch,roll:s.pose.roll,size:s.size,cx:s.cx,cy:s.cy,gx:s.gaze?s.gaze.x:null});
       const fr=(now-reg.t0)/3000; setRing(fr); setMsg(`정면 등록 중… ${Math.max(1,Math.ceil(3-(now-reg.t0)/1000))}초`);
       if(fr>=1&&reg.f.length>=10) finishFront();
-    } else { reg=null; setRing(0); const bad=list.find(c=>!c.ok); const t=bad?(bad.hint||bad.name+' 확인'):''; setMsg(t); speak(t); }
+    } else { reg=null; setRing(0); const bad=list.find(c=>!c.ok); const t=bad?(bad.key==='away'?'고개를 옆으로 크게 돌렸다가 다시 렌즈를 보세요':(bad.hint||bad.name+' 확인')):''; setMsg(''); speak(t); }
     return;
   }
   if(phase==='aim'){
     if(allOk){ if(!holdStart){ holdStart=now; speak('좋아요, 그대로 멈추세요',true); } const f=(now-holdStart)/HOLD; setRing(f*0.3); setMsg('좋아요, 그대로…'); if(f>=1){ phase='burst'; burst=[]; burstFails=0; } }
-    else { holdStart=0; setRing(0); const bad=list.find(c=>!c.ok); const t=bad?(bad.hint||bad.name+' 확인'):''; setMsg(t); speak(t.replace(/\s*\(.*\)$/,'')); }
+    else { holdStart=0; setRing(0); const bad=list.find(c=>!c.ok); const t=bad?(bad.hint||bad.name+' 확인'):''; setMsg(''); speak(t.replace(/\s*\(.*\)$/,'')); }
     return;
   }
   if(phase==='burst'){
     const N=+$('burstN').value;
-    if(allOk){ const f=s.frame, R=s.raw; try{ f.E=computeMetricsE(R.L,R.W,R.H); f.E6=computeMetricsE(R.L,R.W,R.H,0.6); f.E10=computeMetricsE(R.L,R.W,R.H,1.0); }catch(e){} burst.push(f); } else if(++burstFails>Math.ceil(N/3)){ phase='aim'; holdStart=0; setRing(0); setMsg('움직임이 있어서 다시 맞출게요'); return; }
+    if(allOk){ const f=s.frame, R=s.raw; try{ f.E=computeMetricsE(R.L,R.W,R.H); f.E6=computeMetricsE(R.L,R.W,R.H,0.6); f.E10=computeMetricsE(R.L,R.W,R.H,1.0); }catch(e){} burst.push(f); } else if(++burstFails>Math.ceil(N/3)){ const b=list.find(c=>!c.ok); phase='aim'; holdStart=0; setRing(0); if(session){ session.restarts=(session.restarts||0)+1; } setMsg(`찍는 중에 ${b?CHIP[b.key]||b.name:'자세'}이(가) 벗어나서 다시 맞출게요`); return; }
     setRing(0.3+0.7*burst.length/N); setMsg(`측정 중… ${burst.length}/${N}`);
     if(burst.length>=N) finish(s);
   }
@@ -1613,6 +1734,7 @@ async function runTruth(){
 }
 $('btnTruth').onclick=runTruth;
 
+if(location.protocol==='file:') window.__fl={checksFor,applyHyst,hudFor,renderHud,coachText};
 applyRing();
 renderAll();
 setInterval(()=>{ if(phase==='idle') renderToday(); }, 60000);
