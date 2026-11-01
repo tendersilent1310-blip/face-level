@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>얼굴 수평계</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1D5C7A">
+<link rel="apple-touch-icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <style>
@@ -292,6 +295,7 @@ svg text{fill:var(--muted);font-family:var(--font-num);font-size:11px}
       </div>
     </div>
     <div class="note">기록은 이 브라우저에만 있어요. 측정이 끝나면 CSV로 저장해 두세요. 다른 브라우저나 폰으로 옮길 때는 그 CSV를 "CSV 불러오기"로 넣으면 이어져요.</div>
+    <div class="note" id="storeState"></div>
     <div class="note" id="importMsg"></div>
     <div id="clearConfirm" hidden class="confirm">
       <span id="clearText">이 사람의 기록, 메모, 개인 정면을 지울까요? 되돌릴 수 없어요.</span>
@@ -1553,7 +1557,7 @@ function renderRef(){
   if(store.front){ const fu=frontUncertainty(store.front, store.frontChecks); tag.className='tag '+(fu.basis!=='measured'||fu.deg<=2?'ok':'warn'); tag.textContent=`${store.name}의 정면 등록됨 · 좌우 ${store.front.yaw.toFixed(1)}° 위아래 ${store.front.pitch.toFixed(1)}° · 오차 ±${fu.deg.toFixed(1)}°`; }
   else { tag.className='tag warn'; tag.textContent='개인 정면 미등록 (측정 시작 때 먼저 해요)'; }
 }
-function renderAll(){ const eh=$('emptyHint'); if(eh) eh.hidden=Object.values(db.profiles).some(p=>p.records.length); renderPeople(); renderToday(); renderLatest(); renderSummary(); renderTrend(); renderHist(); renderRef(); }
+function renderAll(){ try{ storageStatus(); }catch(e){} const eh=$('emptyHint'); if(eh) eh.hidden=Object.values(db.profiles).some(p=>p.records.length); renderPeople(); renderToday(); renderLatest(); renderSummary(); renderTrend(); renderHist(); renderRef(); }
 
 $('btnResetRef').onclick=()=>{ if(store.front){ store.frontHistory=store.frontHistory||[]; store.frontHistory.push({...store.front, checks:store.frontChecks, ended:new Date().toISOString()}); } store.ref=null; store.front=null; store.frontChecks=[]; save(); renderAll(); };
 $('btnClear').onclick=()=>{ $('clearConfirm').hidden=false; };
@@ -1665,7 +1669,17 @@ $('fileImport').onchange=async e=>{
     $('importMsg').textContent=`불러오기 완료: ${people.join(', ')} · 새로 추가 ${added}개 (이미 있던 건 건너뜀). 옛 CSV에서 온 mm 값은 약간의 근사가 있어요.`;
   }catch(err){ $('importMsg').textContent='불러오지 못했어요: '+(err&&err.message||err); }
 };
-try{ navigator.storage&&navigator.storage.persist&&navigator.storage.persist(); }catch(e){}
+try{ if('serviceWorker' in navigator && location.protocol==='https:') navigator.serviceWorker.register('sw.js'); }catch(e){}
+// 저장 상태 표시: 기록이 몇 개 있는지, 브라우저가 지우지 않게 '영구 보관' 허락을 받았는지
+async function storageStatus(){
+  let persisted=null; try{ if(navigator.storage&&navigator.storage.persist){ persisted=await navigator.storage.persisted(); if(!persisted) persisted=await navigator.storage.persist(); } }catch(e){}
+  const n=Object.values(db.profiles).reduce((a,p)=>a+p.records.length,0);
+  const days=new Set(Object.values(db.profiles).flatMap(p=>p.records.map(r=>dayKey(r.t)))).size;
+  const app=matchMedia('(display-mode: standalone)').matches;
+  const el=$('storeState'); if(!el) return;
+  el.textContent=`이 브라우저에 저장된 기록 ${n}개 (${days}일) · 보관: ${persisted?'영구 ✓':'임시 (브라우저가 지울 수 있음)'} · ${app?'앱으로 열림 ✓':'브라우저 탭으로 열림'}`;
+}
+storageStatus();
 $('btnCsvAll').onclick=()=>download(csvFor(Object.values(db.profiles)),`얼굴수평계_모든사람_${today()}.csv`);
 
 // ---------- 정답 시험 ----------

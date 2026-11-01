@@ -1,0 +1,13 @@
+{
+  "name": "얼굴 수평계",
+  "short_name": "얼굴수평계",
+  "start_url": "face-level.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#1D5C7A",
+  "theme_color": "#1D5C7A",
+  "icons": [
+    {"src": "icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png"}
+  ]
+}
