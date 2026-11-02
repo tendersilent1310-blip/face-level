@@ -218,6 +218,8 @@ svg text{fill:var(--muted);font-family:var(--font-num);font-size:11px}
         </select>
         <label class="sub"><input type="checkbox" id="voice" checked> 음성 안내</label>
         <label class="sub"><input type="checkbox" id="ringOn" checked> 화면 조명</label>
+        <label class="sub" for="setupSel">촬영 방법</label>
+        <select id="setupSel"><option value="hand">손에 들고</option><option value="desk">책상에 기대 놓고</option><option value="stand">거치대</option></select>
       </div>
       <details class="guide" id="guide">
         <summary>쉽게 맞추는 요령</summary>
@@ -789,7 +791,7 @@ function importFromCsv(text){
     const ef={}; for(const f of ['f06','f10']){ ef[f]={}; for(const k of EF) ef[f][k]=num(o['E'+f+'_'+k]); }
     const approxFw=ef.f06.fwPx!=null&&ef.f10.fwPx!=null?(ef.f06.fwPx+ef.f10.fwPx)/2:null;
     const rec={id:Date.parse(t), v:5, fwFix:1, t, day:num(o['실험일차']), kind:kind==='이전버전'?undefined:kind, tag:o['조건']||'', prep:o['흑백보정']==='1', repeatId:o['반복ID']||null,
-      cam:o['카메라']||'user', mmpp:num(o['mm_per_px']), level:num(o['폰기울기']), n:null, img:'', person:name, restored:true,
+      cam:o['카메라']||'user', setup:({'손':'hand','책상':'desk','거치대':'stand'})[o['촬영방법']]||undefined, mmpp:num(o['mm_per_px']), level:num(o['폰기울기']), n:null, img:'', person:name, restored:true,
       cond:{yaw:num(o.yaw),pitch:num(o.pitch),roll:num(o.roll),size:num(o.size),light:num(o['조명_좌우']),lightMean:num(o['조명_밝기'])},
       eF:ef.f06.eye!=null?ef:null};
     if(front) rec.front=front;
@@ -1466,7 +1468,7 @@ function finish(s){
     eF:hasE?{f06:pick(burst.map(f=>f.E6)), f10:pick(burst.map(f=>f.E10))}:null, mmpp,
     level:(tilt.v!=null&&performance.now()-tilt.t<1500)?+tilt.v.toFixed(2):null, n:burst.length,
     cond:{yaw:+s.pose.yaw.toFixed(2),pitch:+s.pose.pitch.toFixed(2),roll:+s.pose.roll.toFixed(2),size:+s.size.toFixed(4),light:+s.light.ratio.toFixed(3),lightMean:Math.round(s.light.mean)},
-    cam:$('camSel').value, img};
+    cam:$('camSel').value, setup:$('setupSel').value, img};
   rec.person=store.name; if(store.front) rec.front={yaw:+store.front.yaw.toFixed(2),pitch:+store.front.pitch.toFixed(2),roll:+store.front.roll.toFixed(2),t:store.front.t};
   store.records.push(rec); save();
   setRing(1);
@@ -1688,7 +1690,7 @@ function renderPeopleSummary(box){
 const csvq=v=>{ const s=String(v??''); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
 function csvFor(profiles){
   const keys=METRICS.map(d=>d.k);
-  const head=['사람','실험종류','정면_좌우','정면_위아래','정면_기울기','정면3회_좌우차이','정면3회_위아래차이','정면오차_도','시간','날짜','실험일차','종류','조건','흑백보정','반복ID','카메라','mm_per_px','폰기울기','yaw','pitch','roll','size','조명_좌우','조명_밝기','잠','술','짠음식','메모'];
+  const head=['사람','실험종류','정면_좌우','정면_위아래','정면_기울기','정면3회_좌우차이','정면3회_위아래차이','정면오차_도','시간','날짜','실험일차','종류','조건','흑백보정','반복ID','카메라','촬영방법','mm_per_px','폰기울기','yaw','pitch','roll','size','조명_좌우','조명_밝기','잠','술','짠음식','메모'];
   const sets=[['A','m','sd'],['B','mB','sdB'],['C','mC','sdC'],['D','mD','sdD'],['E','mE','sdE'],['F','mF','sdF']];
   for(const [n] of sets) for(const k of keys) head.push(n+'_'+k, n+'_'+k+'_sd');
   for(const [n] of sets) head.push(n+'_fwPx');
@@ -1704,7 +1706,7 @@ function csvFor(profiles){
     for(const r of p.records){
       const dk=dayKey(r.t), memo=p.days[dk]||{};
       const F=frontAt(r.t)||r.front, pre=F?[p.name,p.mode==='guest'?'1회':'4주',n2(F.yaw),n2(F.pitch),n2(F.roll),n2(F.spreadYaw),n2(F.spreadPitch),F.tries?frontUncertainty(F,F.checks||(F===p.front?p.frontChecks:[])).deg.toFixed(2):n2(F.deg)]:pre0;
-      const row=[...pre,r.t,dk,r.day??'',r.kind||'이전버전',r.tag||'',r.prep?1:0,r.repeatId||'',r.cam,r.mmpp?r.mmpp.toFixed(5):'',r.level??'',r.cond.yaw,r.cond.pitch,r.cond.roll,r.cond.size,r.cond.light,r.cond.lightMean??'',memo.sleep??'',memo.alcohol?1:'',memo.salty?1:'',memo.note||''];
+      const row=[...pre,r.t,dk,r.day??'',r.kind||'이전버전',r.tag||'',r.prep?1:0,r.repeatId||'',r.cam,{hand:'손',desk:'책상',stand:'거치대'}[r.setup]||'',r.mmpp?r.mmpp.toFixed(5):'',r.level??'',r.cond.yaw,r.cond.pitch,r.cond.roll,r.cond.size,r.cond.light,r.cond.lightMean??'',memo.sleep??'',memo.alcohol?1:'',memo.salty?1:'',memo.note||''];
       for(const [,mk,sk] of sets) for(const k of keys){ const m=r[mk], sdv=r[sk]; row.push(m&&m[k]!=null?m[k].toFixed(4):'', sdv&&sdv[k]!=null?sdv[k].toFixed(4):''); }
       for(const [,mk] of sets){ const m=r[mk]; row.push(m&&m.fwPx!=null?m.fwPx.toFixed(2):''); }
       for(const f of ['f06','f10']) for(const k of EF){ const v=r.eF&&r.eF[f]?r.eF[f][k]:null; row.push(v!=null?v.toFixed(4):''); }
@@ -1712,7 +1714,7 @@ function csvFor(profiles){
       rows.push(row.map(csvq).join(','));
     }
     for(const t of p.truth){
-      const pre=pre0; const row=[...pre,t.t,dayKey(t.t),t.day??'','정답시험','','','','',t.mmpp?t.mmpp.toFixed(5):''];
+      const pre=pre0; const row=[...pre,t.t,dayKey(t.t),t.day??'','정답시험','','','','','',t.mmpp?t.mmpp.toFixed(5):''];
       while(row.length<head.length-TAIL) row.push('');
       row.push(...METHODS.map(M=>t.err&&t.err[M]!=null?t.err[M].toFixed(4):''), ...METHODS.map(M=>t.flip&&t.flip[M]!=null?t.flip[M].toFixed(4):''), ...METHODS.map(M=>t.gain&&t.gain[M]!=null?t.gain[M].toFixed(4):''));
       rows.push(row.map(csvq).join(','));
@@ -1731,6 +1733,7 @@ function download(text, name){
   setTimeout(()=>URL.revokeObjectURL(a.href),2000);
 }
 $('btnCsv').onclick=()=>download(csvFor([store]),`얼굴수평계_${store.name}_${today()}.csv`);
+$('setupSel').value=db.setup||'hand'; $('setupSel').onchange=()=>{ db.setup=$('setupSel').value; save(); };
 $('autoCsv').checked=db.autoCsv!==false; $('autoCsv').onchange=()=>{ db.autoCsv=$('autoCsv').checked; save(); };
 $('btnImport').onclick=()=>$('fileImport').click();
 $('fileImport').onchange=async e=>{
