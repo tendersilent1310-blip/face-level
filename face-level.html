@@ -350,6 +350,8 @@ svg text{fill:var(--muted);font-family:var(--font-num);font-size:11px}
       <select id="burstN"><option>10</option><option selected>20</option><option>30</option></select>
       <button id="btnResetRef">개인 정면 다시 등록</button>
       <label class="sub"><input type="checkbox" id="autoCsv"> 측정 끝나면 CSV 자동 저장</label>
+      <label class="sub" for="breakSel">측정 사이 쉬는 시간</label>
+      <select id="breakSel"><option value="0">없음</option><option value="3">3초</option><option value="5">5초</option><option value="8">8초</option><option value="10">10초</option></select>
     </div>
     <div class="row">
       <label class="sub" for="faceCm">내 얼굴 너비(cm)</label>
@@ -1138,20 +1140,22 @@ $('btnGo').onclick=async()=>{
   $('stage').scrollIntoView({behavior:'smooth',block:'center'});
   announce(q[0],true); renderToday();
 };
-// ---------- 쉬는 시간: 5번 잴 때마다 10초 ----------
-const BREAK_EVERY=5, BREAK_SEC=10; let breakTimer=null;
-function startBreak(item){
-  phase='break'; holdStart=0; burst=[]; setRing(0);
-  let left=BREAK_SEC; $('restSec').textContent=left; $('restCover').hidden=false; setMsg('');
-  speak('잘했어요. 눈을 감고 10초 쉬세요',true);
+// ---------- 쉬는 시간: 한 번 잴 때마다 (기본 5초) ----------
+let breakTimer=null;
+function breakSec(){ return db.breakSec==null?5:db.breakSec; }
+function startBreak(item, changed){
+  phase='break'; holdStart=0; burst=[]; setRing(0); session.nextChanged=changed;
+  let left=breakSec(); $('restSec').textContent=left; $('restCover').hidden=false; setMsg('');
+  speak('눈을 감고 쉬세요',true);
   clearInterval(breakTimer);
   breakTimer=setInterval(()=>{ left--; $('restSec').textContent=Math.max(0,left); if(left<=0) endBreak(item); },1000);
 }
 function endBreak(item){
   clearInterval(breakTimer); breakTimer=null; $('restCover').hidden=true;
   if(!session||phase!=='break') return;
-  phase='rest'; rearmAt=performance.now()+2500; holdStart=0;
-  announce(item||session.queue[session.i],false);
+  phase='rest'; rearmAt=performance.now()+1500; holdStart=0;
+  const it=item||session.queue[session.i];
+  if(session.nextChanged) announce(it,false); else { speak('눈을 뜨고 렌즈를 보세요',true); $('stepBadge').textContent=`${it.label} · ${session.i+1}/${session.queue.length}`; }
 }
 $('btnRestSkip').onclick=()=>endBreak();
 function nextItem(){
@@ -1159,8 +1163,7 @@ function nextItem(){
   session.i++;
   if(session.i>=session.queue.length){ endSession(true); return; }
   const item=session.queue[session.i], changed=item.kind!==prev.kind||item.tag!==prev.tag||item.try!==prev.try;
-  session.sinceBreak=(session.sinceBreak||0)+1;
-  if(session.sinceBreak>=BREAK_EVERY){ session.sinceBreak=0; startBreak(item); return; }
+  if(breakSec()>0){ startBreak(item, changed); return; }
   phase='rest'; rearmAt=performance.now()+(changed?3500:1800); holdStart=0;
   if(changed) announce(item,false); else { $('stepBadge').textContent=`${item.label} · ${session.i+1}/${session.queue.length}`; }
 }
@@ -1889,6 +1892,7 @@ if(inAppBrowser(navigator.userAgent)){ $('inappWarn').hidden=false; $('btnOpenCh
   else if(/Android/i.test(ua)) location.href='intent://'+u.replace(/^https?:\/\//,'')+'#Intent;scheme=https;package=com.android.chrome;end';
   else { try{ navigator.clipboard.writeText(u); }catch(e){} alert('주소를 복사했어요. 사파리나 크롬에 붙여 넣어 열어 주세요.'); } }; }
 $('setupSel').value=db.setup||'hand'; $('setupSel').onchange=()=>{ db.setup=$('setupSel').value; save(); };
+$('breakSel').value=String(breakSec()); $('breakSel').onchange=()=>{ db.breakSec=+$('breakSel').value; save(); };
 $('autoCsv').checked=db.autoCsv!==false; $('autoCsv').onchange=()=>{ db.autoCsv=$('autoCsv').checked; save(); };
 $('btnImport').onclick=()=>$('fileImport').click();
 $('fileImport').onchange=async e=>{
