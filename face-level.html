@@ -143,6 +143,7 @@ svg text{fill:var(--muted);font-family:var(--font-num);font-size:11px}
     <div class="sub" id="engineState">준비 전</div>
   </header>
 
+  <div class="confirm" id="installBox" hidden style="margin-bottom:12px"><span><b>앱으로 설치하면</b> 기록이 더 잘 남고, 홈 화면에서 바로 열려요.</span><button class="primary" id="btnInstall">📲 앱 설치</button></div>
   <div class="confirm" id="inappWarn" hidden style="margin-bottom:12px"><span><b>카톡·인스타 같은 앱 안에서 열렸어요.</b> 여기서는 기록이 지워질 수 있어요. 아래 버튼으로 크롬에서 열어 주세요.</span><button class="primary" id="btnOpenChrome">크롬에서 열기</button></div>
   <section class="panel" aria-label="측정 대상">
     <div class="row" style="justify-content:space-between">
@@ -1787,6 +1788,10 @@ function download(text, name){
   setTimeout(()=>URL.revokeObjectURL(a.href),2000);
 }
 $('btnCsv').onclick=()=>download(csvFor([store]),`얼굴수평계_${store.name}_${today()}.csv`);
+let installEvt=null;
+window.addEventListener('beforeinstallprompt',e=>{ e.preventDefault(); installEvt=e; if(!inAppBrowser(navigator.userAgent)) $('installBox').hidden=false; });
+window.addEventListener('appinstalled',()=>{ $('installBox').hidden=true; installEvt=null; setMsg('설치됐어요! 이제 홈 화면의 얼굴수평계 아이콘으로 열어 주세요.'); });
+$('btnInstall').onclick=async()=>{ if(!installEvt) return; installEvt.prompt(); try{ const r=await installEvt.userChoice; if(r.outcome==='accepted') $('installBox').hidden=true; }catch(e){} installEvt=null; };
 if(inAppBrowser(navigator.userAgent)){ $('inappWarn').hidden=false; $('btnOpenChrome').onclick=()=>{ const u=location.href, ua=navigator.userAgent;
   if(/KAKAOTALK/i.test(ua)) location.href='kakaotalk://web/openExternal?url='+encodeURIComponent(u);
   else if(/Android/i.test(ua)) location.href='intent://'+u.replace(/^https?:\/\//,'')+'#Intent;scheme=https;package=com.android.chrome;end';
