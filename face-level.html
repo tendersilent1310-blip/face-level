@@ -175,6 +175,14 @@ svg text{fill:var(--muted);font-family:var(--font-num);font-size:11px}
     <ol class="steps" id="steps"></ol>
     <div class="note" id="coach"></div>
     <button class="primary big" id="btnGo">오늘 측정 시작</button>
+    <div class="memo" id="freeBox">
+      <div class="row" style="justify-content:space-between"><b>내가 고르는 실험</b><span class="sub">아무 날이나, 3번씩</span></div>
+      <div class="row">
+        <select id="freeSel" aria-label="실험 고르기"></select>
+        <button id="btnFree">이 실험 하기</button>
+      </div>
+      <div class="note" id="freeHint"></div>
+    </div>
     <div class="memo" id="memoBox">
       <div class="row" style="justify-content:space-between"><b>한 줄 메모</b><span class="sub" id="memoState"></span></div>
       <div class="row">
@@ -224,7 +232,7 @@ svg text{fill:var(--muted);font-family:var(--font-num);font-size:11px}
       <details class="guide" id="guide">
         <summary>쉽게 맞추는 요령</summary>
         <ol>
-          <li><b>폰 세우기:</b> 거치대나 책·컵에 기대 세워요. 손으로 들면 매번 높이가 달라져요.</li>
+          <li><b>폰 잡기:</b> 손에 들어도, 책상에 기대도, 거치대도 괜찮아요. 아래 <b>"촬영 방법"</b>에 고른 대로 기록돼서 어느 쪽이 정확한지 비교해요. 손에 들 땐 <b>카메라를 눈높이</b>로 들어요.</li>
           <li><b>거리:</b> 의자에 등을 붙이고 앉아 <b>팔을 쭉 뻗어 손끝이 폰에 닿는 거리</b>(약 60cm). 폰 자리를 테이프로 표시해 두면 매일 똑같아요.</li>
           <li><b>높이:</b> 카메라가 눈높이쯤 오게 해요.</li>
           <li><b>개인 정면 등록 (처음 한 번):</b> 편하게 앉아 폰 위쪽 <b>카메라 렌즈</b>를 3초 바라보면, 그 자세가 나만의 정면이 돼요. 억지로 똑바로 하지 말고 평소처럼요.</li>
@@ -906,8 +914,18 @@ const TARGET={
   '끄덕임 위':{pitch:-5,skip:'pitch'}, '끄덕임 아래':{pitch:5,skip:'pitch'},
   '더 가까이':{size:1.12,skip:'dist'}, '더 멀리':{size:0.88,skip:'dist'},
   '옆으로 기울임':{roll:4,skip:'roll'}, '살짝 웃음':{smile:true,skip:'expr'},
-  '측면 조명':{}, '안경':{}, '저녁 시간':{}
+  '측면 조명':{}, '안경':{}, '저녁 시간':{},
+  '입 벌림':{open:true,skip:'expr'}, '아침':{}, '점심':{}, '저녁':{}, '자기 전':{},
+  '마사지 전':{}, '마사지 후':{}, '운동 전':{}, '운동 후':{}, '샤워 후':{}, '식사 후':{}
 };
+// 아무 날이나 골라서 하는 자유 실험 (3번씩)
+const FREE=[
+  ['표정', ['살짝 웃음','입 벌림']],
+  ['때', ['아침','점심','저녁','자기 전','식사 후','샤워 후']],
+  ['전·후 비교', ['마사지 전','마사지 후','운동 전','운동 후']],
+  ['자세', ['고개 좌우 4°','끄덕임 위','끄덕임 아래','옆으로 기울임','더 가까이','더 멀리']],
+  ['환경', ['측면 조명','안경']]
+];
 const TAG_SAY={
   '고개 좌우 2°':'고개를 아주 살짝 돌려서, 빨간 점을 옆으로 옮겨간 초록 원에 넣으세요',
   '고개 좌우 4°':'고개를 조금 돌려서, 빨간 점을 초록 원에 넣으세요',
@@ -918,13 +936,18 @@ const TAG_SAY={
   '옆으로 기울임':'고개를 한쪽 어깨 쪽으로 살짝 기울이세요',
   '살짝 웃음':'살짝 웃은 채로 멈춰 주세요',
   '측면 조명':'한쪽 옆에서만 빛이 오게 해 주세요. 스탠드나 창문 쪽으로 몸을 돌리면 돼요',
-  '안경':'안경을 쓰고 평소처럼 측정해요','저녁 시간':'저녁에 평소처럼 측정해요'
+  '안경':'안경을 쓰고 평소처럼 측정해요','저녁 시간':'저녁에 평소처럼 측정해요',
+  '입 벌림':'입을 손가락 두 개 들어갈 만큼 벌리고 멈춰 주세요. 턱이 어느 쪽으로 가는지 봐요',
+  '아침':'아침에 평소처럼 측정해요','점심':'점심에 평소처럼 측정해요','저녁':'저녁에 평소처럼 측정해요','자기 전':'자기 전에 평소처럼 측정해요',
+  '마사지 전':'마사지하기 바로 전에 평소처럼 측정해요','마사지 후':'마사지가 끝나고 바로 평소처럼 측정해요',
+  '운동 전':'운동하기 바로 전에 평소처럼 측정해요','운동 후':'운동이 끝나고 바로 평소처럼 측정해요',
+  '샤워 후':'샤워하고 나서 평소처럼 측정해요','식사 후':'밥 먹고 나서 평소처럼 측정해요'
 };
 const KIND_NAME={front:'개인 정면 등록',fcheck:'정면 확인',normal:'정상 측정',repeat:'반복 측정',clahe:'흑백 보정 측정',cond:'실험 측정',extra:'추가 측정'};
 
 // ---------- 오늘의 실험 ----------
 const today=()=>dayKey(Date.now());
-function protoDates(){ return [...new Set(store.records.filter(r=>r.kind&&r.kind!=='extra').map(r=>dayKey(r.t)))].sort(); }
+function protoDates(){ return [...new Set(store.records.filter(r=>r.kind&&r.kind!=='extra'&&!r.free).map(r=>dayKey(r.t)))].sort(); }
 function dayNum(){ const d=protoDates(), i=d.indexOf(today()); return i>=0?i+1:d.length+1; }
 function todayCount(kind, tag){ const t=today(); return store.records.filter(r=>r.kind===kind&&dayKey(r.t)===t&&(tag==null||r.tag===tag)).length; }
 function stepState(st){
@@ -1047,6 +1070,31 @@ function announce(item, first){
   speak(t,true);
   $('stepBadge').hidden=false; $('stepBadge').textContent=`${item.label} · ${session.i+1}/${session.queue.length}`;
 }
+function fillFree(){
+  const sel=$('freeSel'); if(sel.options.length) return;
+  for(const [g,tags] of FREE){ const og=document.createElement('optgroup'); og.label=g; for(const t of tags){ const o=document.createElement('option'); o.value=o.textContent=t; og.appendChild(o); } sel.appendChild(og); }
+  sel.value=db.freeTag||'입 벌림'; sel.onchange=()=>{ db.freeTag=sel.value; save(); freeHint(); }; freeHint();
+}
+function freeHint(){ const t=$('freeSel').value, n=store.records.filter(r=>r.kind==='cond'&&r.tag===t).length;
+  $('freeHint').textContent=`${TAG_SAY[t]||''} (지금까지 ${n}번)`+(/전$/.test(t)?' — 끝나고 "후"도 꼭 같이 재요.':''); }
+$('btnFree').onclick=async()=>{
+  if(session&&phase!=='idle') return;
+  const t=$('freeSel').value, q=[];
+  if(!store.front) for(let i=1;i<=3;i++) q.push({kind:'front',try:i,label:KIND_NAME.front+` ${i}/3`,target:{front:true}});
+  if(!todayCount('normal')) q.push({kind:'normal',free:true,label:KIND_NAME.normal+' (비교 기준)'});
+  for(let i=0;i<3;i++) q.push({kind:'cond',tag:t,free:true,target:TARGET[t]||{},label:'실험: '+t});
+  startSession(q);
+};
+async function startSession(q){
+  $('btnGo').disabled=true;
+  const ok=await ensureRunning();
+  $('btnGo').disabled=false;
+  if(!ok) return;
+  reg=null;
+  session={queue:q,i:0}; phase='aim'; holdStart=0; burst=[]; renderPeople();
+  $('stage').scrollIntoView({behavior:'smooth',block:'center'});
+  announce(q[0],true); renderToday();
+}
 $('btnGo').onclick=async()=>{
   if(session&&phase!=='idle'){ endSession(false); return; }
   $('btnGo').disabled=true;
@@ -1086,11 +1134,12 @@ async function endSession(finished){
   renderToday();
   if(!finished){ setMsg('멈췄어요. 이어서 하려면 위의 버튼을 누르세요.'); return; }
   const plan=planFor(dayNum(),store.mode);
-  const needTruth=plan.steps.some(s=>s.k==='truth') && !store.truth.some(x=>dayKey(x.t)===today());
+  const free=sess&&sess.queue.every(x=>x.free||x.kind==='front');
+  const needTruth=!free&&plan.steps.some(s=>s.k==='truth') && !store.truth.some(x=>dayKey(x.t)===today());
   if(needTruth&&lastNormalFrame){ setMsg('측정 끝! 정답 시험을 하는 중이에요…'); await runTruth(); }
   let auto='';
   if(db.autoCsv!==false){ try{ attachPose(); download(csvFor([store]),`얼굴수평계_${store.name}_${today()}.csv`); auto=' CSV도 자동으로 저장했어요(다운로드 폴더).'; }catch(e){} }
-  setMsg('오늘 측정 끝! 수고했어요.'+auto);
+  setMsg((free?'실험 끝! 수고했어요.':'오늘 측정 끝! 수고했어요.')+auto); try{ freeHint(); }catch(e){}
   speak('오늘 측정 끝. 수고했어요',true);
   renderToday(); renderSummary();
 }
@@ -1228,7 +1277,8 @@ function checksFor(s,T){
   add('light','조명 (기록만)',true,`좌우 ${Math.round(s.light.ratio*100)}%`, lgood?'':(s.light.mean<60?'조금 어두워요. 측정은 계속해요':s.light.mean>215?'조금 밝아요. 측정은 계속해요':'한쪽에 그림자가 있어요. 측정은 계속해요'),null,!lgood);
   // 표정
   const smile=Math.max(s.bs.mouthSmileLeft||0,s.bs.mouthSmileRight||0), jaw=s.bs.jawOpen||0, blink=Math.max(s.bs.eyeBlinkLeft||0,s.bs.eyeBlinkRight||0);
-  if(T.smile) add('expr','목표: 살짝 웃음',smile>=0.3&&jaw<0.15&&blink<0.45,'', smile<0.3?'조금만 더 웃어 주세요':jaw>=0.15?'입은 다물어 주세요':'눈을 떠 주세요');
+  if(T.open) add('expr','목표: 입 벌림',jaw>=0.3&&smile<0.3&&blink<0.45,'', jaw<0.3?'입을 조금 더 벌려 주세요':smile>=0.3?'웃음은 풀어 주세요':'눈을 떠 주세요');
+  else if(T.smile) add('expr','목표: 살짝 웃음',smile>=0.3&&jaw<0.15&&blink<0.45,'', smile<0.3?'조금만 더 웃어 주세요':jaw>=0.15?'입은 다물어 주세요':'눈을 떠 주세요');
   else add('expr','무표정',smile<0.25&&jaw<0.12&&blink<0.45,'', smile>=0.25?'웃음을 풀어 주세요':jaw>=0.12?'입을 다물어 주세요':blink>=0.45?'눈을 떠 주세요':'');
   add('still','멈춤',s.motion<TOL.motion,'', '잠깐 그대로 멈춰 주세요');
   return list;
@@ -1469,6 +1519,7 @@ function finish(s){
     level:(tilt.v!=null&&performance.now()-tilt.t<1500)?+tilt.v.toFixed(2):null, n:burst.length,
     cond:{yaw:+s.pose.yaw.toFixed(2),pitch:+s.pose.pitch.toFixed(2),roll:+s.pose.roll.toFixed(2),size:+s.size.toFixed(4),light:+s.light.ratio.toFixed(3),lightMean:Math.round(s.light.mean)},
     cam:$('camSel').value, setup:$('setupSel').value, img};
+  if(it.free) rec.free=true;
   rec.person=store.name; if(store.front) rec.front={yaw:+store.front.yaw.toFixed(2),pitch:+store.front.pitch.toFixed(2),roll:+store.front.roll.toFixed(2),t:store.front.t};
   store.records.push(rec); save();
   setRing(1);
@@ -1635,7 +1686,7 @@ function renderRef(){
   if(store.front){ const fu=frontUncertainty(store.front, store.frontChecks); tag.className='tag '+(fu.basis!=='measured'||fu.deg<=2?'ok':'warn'); tag.textContent=`${store.name}의 정면 등록됨 · 좌우 ${store.front.yaw.toFixed(1)}° 위아래 ${store.front.pitch.toFixed(1)}° · 오차 ±${fu.deg.toFixed(1)}°`; }
   else { tag.className='tag warn'; tag.textContent='개인 정면 미등록 (측정 시작 때 먼저 해요)'; }
 }
-function renderAll(){ try{ storageStatus(); }catch(e){} try{ attachPose(); }catch(e){} const eh=$('emptyHint'); if(eh) eh.hidden=Object.values(db.profiles).some(p=>p.records.length); renderPeople(); renderToday(); renderLatest(); renderSummary(); renderTrend(); renderHist(); renderRef(); }
+function renderAll(){ try{ storageStatus(); }catch(e){} try{ attachPose(); }catch(e){} const eh=$('emptyHint'); if(eh) eh.hidden=Object.values(db.profiles).some(p=>p.records.length); renderPeople(); renderToday(); try{ fillFree(); freeHint(); }catch(e){} renderLatest(); renderSummary(); renderTrend(); renderHist(); renderRef(); }
 
 $('btnResetRef').onclick=()=>{ if(store.front){ store.frontHistory=store.frontHistory||[]; store.frontHistory.push({...store.front, checks:store.frontChecks, ended:new Date().toISOString()}); } store.ref=null; store.front=null; store.frontChecks=[]; save(); renderAll(); };
 $('btnClear').onclick=()=>{ $('clearConfirm').hidden=false; };
