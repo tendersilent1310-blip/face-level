@@ -1891,7 +1891,7 @@ if(inAppBrowser(navigator.userAgent)){ $('inappWarn').hidden=false; $('btnOpenCh
   if(/KAKAOTALK/i.test(ua)) location.href='kakaotalk://web/openExternal?url='+encodeURIComponent(u);
   else if(/Android/i.test(ua)) location.href='intent://'+u.replace(/^https?:\/\//,'')+'#Intent;scheme=https;package=com.android.chrome;end';
   else { try{ navigator.clipboard.writeText(u); }catch(e){} alert('주소를 복사했어요. 사파리나 크롬에 붙여 넣어 열어 주세요.'); } }; }
-$('setupSel').value=db.setup||'hand'; $('setupSel').onchange=()=>{ db.setup=$('setupSel').value; save(); };
+$('setupSel').value=db.setup||'desk'; $('setupSel').onchange=()=>{ db.setup=$('setupSel').value; save(); };
 $('breakSel').value=String(breakSec()); $('breakSel').onchange=()=>{ db.breakSec=+$('breakSel').value; save(); };
 $('autoCsv').checked=db.autoCsv!==false; $('autoCsv').onchange=()=>{ db.autoCsv=$('autoCsv').checked; save(); };
 $('btnImport').onclick=()=>$('fileImport').click();
