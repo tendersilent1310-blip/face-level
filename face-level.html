@@ -308,6 +308,19 @@ svg text{fill:var(--muted);font-family:var(--font-num);font-size:11px}
     </div>
     <div class="note">기록은 이 브라우저에만 있어요. 측정이 끝나면 CSV로 저장해 두세요. 다른 브라우저나 폰으로 옮길 때는 그 CSV를 "CSV 불러오기"로 넣으면 이어져요.</div>
     <div class="note" id="storeState"></div>
+    <div class="memo" id="sheetBox">
+      <div class="row" style="justify-content:space-between"><b>구글 시트로 보내기</b><span class="tag" id="sheetTag">연결 안 됨</span></div>
+      <div class="note" id="sheetInfo">시트가 연결되면 측정이 끝날 때마다 숫자만(사진 없음) 시트로 올라가요.</div>
+      <div class="confirm" id="sheetAsk" hidden><span><b id="sheetAskWho"></b>의 측정 숫자(사진 없음)를 이 링크를 준 사람의 구글 시트로 보낼까요? 별명만 보내고, 언제든 끌 수 있어요.</span><button class="primary" id="sheetYes">보낼게요</button><button id="sheetNo">안 보낼래요</button></div>
+      <div class="row">
+        <button id="btnSheetNow">지금 시트로 보내기</button>
+        <label class="sub"><input type="checkbox" id="sheetOn"> 이 사람 기록 보내기</label>
+      </div>
+      <details><summary class="sub">시트 주소 직접 넣기 (주인용)</summary>
+        <div class="row"><input type="text" id="sheetUrl" placeholder="https://script.google.com/macros/s/…/exec"><button id="sheetSave">저장</button></div>
+        <div class="row"><button id="btnShareLink">시트 연결된 링크 복사 (나눠 주기용)</button></div>
+      </details>
+    </div>
     <div class="note" id="importMsg"></div>
     <div id="clearConfirm" hidden class="confirm">
       <span id="clearText">이 사람의 기록, 메모, 개인 정면을 지울까요? 되돌릴 수 없어요.</span>
@@ -1143,6 +1156,7 @@ async function endSession(finished){
   if(needTruth&&lastNormalFrame){ setMsg('측정 끝! 정답 시험을 하는 중이에요…'); await runTruth(); }
   let auto='';
   if(db.autoCsv!==false){ try{ attachPose(); download(csvFor([store]),`얼굴수평계_${store.name}_${today()}.csv`); auto=' CSV도 자동으로 저장했어요(다운로드 폴더).'; }catch(e){} }
+  const sh=await sendSheet(false); if(sh==='ok') auto+=' 시트로도 보냈어요.'; else if(sh==='err') auto+=' 시트 보내기는 실패했어요(나중에 다시 보내요).';
   setMsg((free?'실험 끝! 수고했어요.':'오늘 측정 끝! 수고했어요.')+auto); try{ freeHint(); }catch(e){}
   speak('오늘 측정 끝. 수고했어요',true);
   renderToday(); renderSummary();
@@ -1690,7 +1704,7 @@ function renderRef(){
   if(store.front){ const fu=frontUncertainty(store.front, store.frontChecks); tag.className='tag '+(fu.basis!=='measured'||fu.deg<=2?'ok':'warn'); tag.textContent=`${store.name}의 정면 등록됨 · 좌우 ${store.front.yaw.toFixed(1)}° 위아래 ${store.front.pitch.toFixed(1)}° · 오차 ±${fu.deg.toFixed(1)}°`; }
   else { tag.className='tag warn'; tag.textContent='개인 정면 미등록 (측정 시작 때 먼저 해요)'; }
 }
-function renderAll(){ try{ storageStatus(); }catch(e){} try{ attachPose(); }catch(e){} const eh=$('emptyHint'); if(eh) eh.hidden=Object.values(db.profiles).some(p=>p.records.length); renderPeople(); renderToday(); try{ fillFree(); freeHint(); }catch(e){} renderLatest(); renderSummary(); renderTrend(); renderHist(); renderRef(); }
+function renderAll(){ try{ storageStatus(); }catch(e){} try{ attachPose(); }catch(e){} const eh=$('emptyHint'); if(eh) eh.hidden=Object.values(db.profiles).some(p=>p.records.length); renderPeople(); renderToday(); try{ fillFree(); freeHint(); }catch(e){} try{ renderSheet(); }catch(e){} renderLatest(); renderSummary(); renderTrend(); renderHist(); renderRef(); }
 
 $('btnResetRef').onclick=()=>{ if(store.front){ store.frontHistory=store.frontHistory||[]; store.frontHistory.push({...store.front, checks:store.frontChecks, ended:new Date().toISOString()}); } store.ref=null; store.front=null; store.frontChecks=[]; save(); renderAll(); };
 $('btnClear').onclick=()=>{ $('clearConfirm').hidden=false; };
@@ -1782,6 +1796,42 @@ function csvFor(profiles){
   }
   return '﻿'+rows.join('\n');
 }
+// ---------- 구글 시트로 보내기 ----------
+// 링크 끝 #s=<스크립트ID> 로 연결. 주소는 공개 코드에 넣지 않음
+function sheetIdFrom(x){ const m=String(x||'').match(/macros\/s\/([\w-]{20,})/)||String(x||'').match(/^([\w-]{20,})$/); return m?m[1]:null; }
+function sheetUrl(){ return db.sheetId?`https://script.google.com/macros/s/${db.sheetId}/exec`:null; }
+function devId(){ if(!db.devId){ db.devId=Math.random().toString(36).slice(2,6); save(); } return db.devId; }
+async function sendSheet(force){
+  const u=sheetUrl(); if(!u) return null;
+  if(store.shareOK!==true){ if(store.shareOK!==false) askShare(); return null; }
+  if(!force&&store.sheetSentN===store.records.length) return 'same';
+  try{ attachPose(); }catch(e){}
+  const body=JSON.stringify({v:1, tab:`${store.name}_${devId()}`, n:store.records.length, csv:csvFor([store])});
+  try{
+    const r=await fetch(u,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body});
+    const j=await r.json(); if(!j.ok) throw new Error(j.err||'fail');
+    store.sheetSentN=store.records.length; store.sheetSentT=new Date().toISOString(); save(); renderSheet(); return 'ok';
+  }catch(e){ store.sheetErr=String(e.message||e); save(); renderSheet(); return 'err'; }
+}
+function askShare(){ $('sheetAsk').hidden=false; $('sheetAskWho').textContent=store.name; }
+function renderSheet(){
+  const on=!!db.sheetId; $('sheetTag').className='tag '+(on?'ok':'warn'); $('sheetTag').textContent=on?'연결됨':'연결 안 됨';
+  $('sheetOn').checked=store.shareOK===true; $('sheetOn').disabled=!on; $('btnSheetNow').disabled=!on||store.shareOK!==true; $('btnShareLink').disabled=!on;
+  $('sheetUrl').value=sheetUrl()||'';
+  $('sheetInfo').textContent=!on?'시트가 연결되면 측정이 끝날 때마다 숫자만(사진 없음) 시트로 올라가요.'
+    : store.shareOK!==true?`${store.name}: 보내기 꺼짐. 켜려면 "이 사람 기록 보내기"를 체크하세요.`
+    : store.sheetSentT?`${store.name}: 마지막으로 보낸 때 ${new Date(store.sheetSentT).toLocaleString('ko-KR')} · 기록 ${store.sheetSentN}개`+(store.sheetErr&&store.sheetSentN!==store.records.length?` · 지난번 실패(${store.sheetErr}). 인터넷 확인 후 "지금 보내기"`:'')
+    : `${store.name}: 아직 안 보냈어요. 측정이 끝나면 자동으로 보내요.`;
+  $('sheetAsk').hidden=!(on&&store.shareOK==null&&store.records.length);
+  if(!$('sheetAsk').hidden) $('sheetAskWho').textContent=store.name;
+}
+(function(){ const m=location.hash.match(/[#&]s=([\w-]{20,})/); if(m){ db.sheetId=m[1]; save(); window.history.replaceState(null,'',location.pathname+location.search); } })();
+$('sheetYes').onclick=async()=>{ store.shareOK=true; save(); $('sheetAsk').hidden=true; renderSheet(); const r=await sendSheet(true); setMsg(r==='ok'?'시트로 보냈어요.':'시트로 못 보냈어요. 인터넷을 확인하고 "지금 시트로 보내기"를 눌러 주세요.'); };
+$('sheetNo').onclick=()=>{ store.shareOK=false; save(); $('sheetAsk').hidden=true; renderSheet(); };
+$('sheetOn').onchange=()=>{ store.shareOK=$('sheetOn').checked; save(); renderSheet(); if(store.shareOK) sendSheet(true); };
+$('btnSheetNow').onclick=async()=>{ $('btnSheetNow').disabled=true; const r=await sendSheet(true); $('btnSheetNow').disabled=false; setMsg(r==='ok'?'시트로 보냈어요.':'시트로 못 보냈어요. 인터넷을 확인해 주세요.'); };
+$('sheetSave').onclick=()=>{ const id=sheetIdFrom($('sheetUrl').value); if(!id&&$('sheetUrl').value.trim()){ setMsg('주소가 이상해요. …/macros/s/…/exec 모양이어야 해요.'); return; } db.sheetId=id||null; save(); renderSheet(); setMsg(id?'시트를 연결했어요.':'시트 연결을 끊었어요.'); };
+$('btnShareLink').onclick=async()=>{ const l=location.origin+location.pathname+'#s='+db.sheetId; try{ await navigator.clipboard.writeText(l); setMsg('링크를 복사했어요. 카톡에 붙여 넣어 나눠 주세요.'); }catch(e){ prompt('이 링크를 복사해서 나눠 주세요',l); } };
 function download(text, name){
   const blob=new Blob([text],{type:'text/csv'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click();
