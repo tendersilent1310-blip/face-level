@@ -48,6 +48,17 @@ h2{font-size:15px;margin:0;font-weight:600}
 .stage .restcover[hidden]{display:none}
 .stage .restcover b{font-size:64px;line-height:1}
 .stage .restcover button{font-size:16px;padding:10px 18px;border-radius:999px;background:#fff;color:#0d2733;border:0;font-weight:700}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.seg button{border:0;border-radius:0;padding:8px 14px;background:transparent}
+.seg button.on{background:var(--accent,#1D5C7A);color:#fff}
+.viewwrap{position:relative;max-width:420px;width:100%;margin:0 auto}
+.viewwrap canvas{width:100%;height:auto;display:block;border-radius:12px;background:#000}
+.viewtag{position:absolute;left:10px;top:10px;background:rgba(0,0,0,.65);color:#fff;font-size:13px;font-weight:700;padding:4px 10px;border-radius:999px}
+.viewside{position:absolute;bottom:10px;background:rgba(0,0,0,.55);color:#fff;font-size:12px;padding:3px 8px;border-radius:999px}
+.viewside.l{left:10px}.viewside.r{right:10px}
+.viewlegend{list-style:none;padding:0;margin:0;display:grid;gap:6px}
+.viewlegend li{display:flex;gap:8px;align-items:baseline;font-size:14px}
+.viewlegend i{flex:none;width:12px;height:12px;border-radius:3px;display:inline-block;transform:translateY(1px)}
 .stage .step-badge{position:absolute;left:12px;top:12px;background:rgba(0,0,0,.6);color:#fff;font-size:13px;font-weight:600;padding:5px 10px;border-radius:999px}
 .stage .start{position:absolute;inset:0;display:grid;place-items:center;align-content:center;gap:10px;color:#fff;text-align:center;padding:20px}
 .ring{position:absolute;top:12px;right:12px;width:54px;height:54px}
@@ -292,6 +303,26 @@ svg text{fill:var(--muted);font-family:var(--font-num);font-size:11px}
     <div class="metrics" id="metrics"></div>
     <div id="methodBox"></div>
     <div class="note">0에 가까울수록 좌우가 같아요. 검은 눈동자(홍채, 약 11.7mm)를 자로 써서 mm로 보여줘요. 방향은 <b>내 기준</b> 왼쪽/오른쪽이에요. 색 표시는 일반인이 사진에서 알아채기 시작한다는 크기(눈 2mm, 입·턱끝 3mm 등, 작은 연구 기준)와 비교한 참고값이에요.</div>
+  </section>
+
+  <section class="panel" aria-label="비대칭 눈으로 보기" id="viewPanel">
+    <div class="row" style="justify-content:space-between">
+      <h2>내 얼굴 비대칭 눈으로 보기</h2>
+      <button class="primary" id="btnView" disabled>방금 얼굴로 보기</button>
+    </div>
+    <div class="note" id="viewNote">측정을 한 번 하면 방금 찍힌 얼굴로 볼 수 있어요. 사진은 이 화면에서만 쓰고 저장하거나 보내지 않아요.</div>
+    <div id="viewBox" hidden>
+      <div class="row">
+        <div class="seg" role="tablist" id="viewModes">
+          <button data-m="flick" class="on">깜빡이</button><button data-m="lines">선 보기</button><button data-m="diff">차이 지도</button>
+        </div>
+        <label class="sub"><input type="checkbox" id="viewMirror"> 거울처럼 보기</label>
+        <label class="sub" id="viewExWrap"><input type="checkbox" id="viewEx"> 3배 확대</label>
+      </div>
+      <div class="viewwrap"><canvas id="viewCv"></canvas><div class="viewtag" id="viewTag"></div><div class="viewside l" id="viewSideL"></div><div class="viewside r" id="viewSideR"></div></div>
+      <div class="note" id="viewHelp"></div>
+      <ul class="viewlegend" id="viewLegend"></ul>
+    </div>
   </section>
 
   <section class="panel" aria-label="정답 시험">
@@ -1555,6 +1586,105 @@ function finishFront(){
   speak(sp<=2?'정면 등록 완료. 세 번이 거의 같았어요':'정면 등록 완료. 세 번이 조금씩 달랐어요. 기록해 둘게요',true);
   renderAll(); nextItem();
 }
+// ---------- 비대칭 눈으로 보기 (사진은 화면에서만 쓰고 저장 안 함) ----------
+let view=null, viewTimer=null;
+const VCOL={eye:'#ffd23f', mouth:'#ff6b9a', chin:'#4dd2ff', nose:'#9dff6b'};
+async function ensureImgLm(){ if(!imgLandmarker) imgLandmarker=await FL.createFromOptions(files,{baseOptions:{modelAssetPath:MODEL,delegate:'CPU'},runningMode:'IMAGE',numFaces:1,outputFacialTransformationMatrixes:true}); }
+function lastMM(k){ const r=[...store.records].reverse().find(x=>x.mE&&x.mmpp&&x.mE.fwPx); if(!r||r.mE[k]==null) return null; return r.mE[k]/100*r.mE.fwPx*r.mmpp; }
+async function buildView(){
+  if(!lastNormalFrame) return;
+  $('btnView').disabled=true; $('viewNote').textContent='얼굴 준비 중…';
+  try{
+    await ensureImgLm();
+    const fr=lastNormalFrame, base=analyzeImage(fr);
+    if(!base){ $('viewNote').textContent='사진에서 얼굴을 못 찾았어요. 다시 측정한 뒤 눌러 주세요.'; return; }
+    const f=mirrorFit(base.P), Q=transform(base.P,f.angle,f.center), x0=midlineX(Q);
+    // 1) 얼굴 축이 세로가 되게 돌린 사진
+    const R=document.createElement('canvas'); R.width=fr.width; R.height=fr.height;
+    { const g=R.getContext('2d'); g.translate(f.center.x,f.center.y); g.rotate(-f.angle); g.translate(-f.center.x,-f.center.y); g.drawImage(fr,0,0); }
+    // 2) 얼굴 중심선 기준으로 뒤집은 사진
+    const M=document.createElement('canvas'); M.width=R.width; M.height=R.height;
+    { const g=M.getContext('2d'); g.translate(2*x0,0); g.scale(-1,1); g.drawImage(R,0,0); }
+    // 3) 얼굴 둘레로 자르기 (중심선이 가운데 오게)
+    const xs=Q.map(p=>p.x), ys=Q.map(p=>p.y);
+    const half=Math.max(x0-Math.min(...xs), Math.max(...xs)-x0)*1.18, y0=Math.min(...ys), y1=Math.max(...ys), padY=(y1-y0)*0.12;
+    const box={x:x0-half, y:y0-padY, w:half*2, h:(y1-y0)+padY*2};
+    const out=Math.min(640, Math.round(box.w)), sc=out/box.w;
+    view={R,M,Q,x0,box,sc,W:out,H:Math.round(box.h*sc),mode:view?view.mode:'flick',flip:false,diff:null};
+    $('viewBox').hidden=false; $('viewNote').textContent='방금 측정한 얼굴이에요. 비대칭 숫자는 E 방식 마지막 측정 값이에요.';
+    drawView(); setViewMode(view.mode);
+    $('viewPanel').scrollIntoView({behavior:'smooth',block:'start'});
+  }catch(e){ $('viewNote').textContent='보기를 만들다 문제가 생겼어요: '+(e&&e.message||e); }
+  finally{ $('btnView').disabled=!lastNormalFrame; }
+}
+function crop(src){ const c=document.createElement('canvas'); c.width=view.W; c.height=view.H; c.getContext('2d').drawImage(src,view.box.x,view.box.y,view.box.w,view.box.h,0,0,view.W,view.H); return c; }
+function diffMap(){
+  if(view.diff) return view.diff;
+  const a=crop(view.R).getContext('2d').getImageData(0,0,view.W,view.H).data, b=crop(view.M).getContext('2d').getImageData(0,0,view.W,view.H).data;
+  const W=view.W,H=view.H, d=new Float32Array(W*H);
+  for(let i=0,j=0;i<d.length;i++,j+=4){ const la=.299*a[j]+.587*a[j+1]+.114*a[j+2], lb=.299*b[j]+.587*b[j+1]+.114*b[j+2]; d[i]=Math.abs(la-lb); }
+  const r=Math.max(2,Math.round(W/70)), t=new Float32Array(W*H), u=new Float32Array(W*H);
+  for(let y=0;y<H;y++){ let s=0; for(let x=-r;x<W;x++){ if(x+r<W) s+=d[y*W+x+r]; if(x-r-1>=0) s-=d[y*W+x-r-1]; if(x>=0) t[y*W+x]=s/(2*r+1); } }
+  for(let x=0;x<W;x++){ let s=0; for(let y=-r;y<H;y++){ if(y+r<H) s+=t[(y+r)*W+x]; if(y-r-1>=0) s-=t[(y-r-1)*W+x]; if(y>=0) u[y*W+x]=s/(2*r+1); } }
+  const sorted=Array.from(u).sort((p,q)=>p-q), lo=sorted[Math.floor(sorted.length*0.5)], hi=sorted[Math.floor(sorted.length*0.98)]||1;
+  const img=new ImageData(W,H), cx=W/2, cy=H*0.52, rx=W*0.42, ry=H*0.47;
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++){ const i=y*W+x, e=((x-cx)/rx)**2+((y-cy)/ry)**2; if(e>1) continue;
+    const v=Math.max(0,Math.min(1,(u[i]-lo)/(hi-lo||1))); img.data[i*4]=255; img.data[i*4+1]=40; img.data[i*4+2]=40; img.data[i*4+3]=Math.round(v*170); }
+  view.diff=img; return img;
+}
+function drawView(){
+  if(!view) return;
+  const cv=$('viewCv'); cv.width=view.W; cv.height=view.H; const g=cv.getContext('2d');
+  const mir=$('viewMirror').checked, show=view.mode==='flick'&&view.flip?view.M:view.R;
+  g.save(); if(mir){ g.translate(view.W,0); g.scale(-1,1); } g.drawImage(crop(show),0,0); g.restore();
+  // 사진 방향: 원래 사진 = 남이 보는 방향 → 내 왼쪽이 화면 오른쪽. 거울 보기면 반대
+  $('viewSideL').textContent=mir?'내 왼쪽':'내 오른쪽'; $('viewSideR').textContent=mir?'내 오른쪽':'내 왼쪽';
+  const X=x=>{ const v=(x-view.box.x)*view.sc; return mir?view.W-v:v; }, Y=y=>(y-view.box.y)*view.sc;
+  if(view.mode==='flick'){ $('viewTag').textContent=view.flip?'뒤집은 얼굴':'원래 얼굴'; return; }
+  if(view.mode==='diff'){
+    const tmp=document.createElement('canvas'); tmp.width=view.W; tmp.height=view.H; tmp.getContext('2d').putImageData(diffMap(),0,0);
+    g.save(); if(mir){ g.translate(view.W,0); g.scale(-1,1); } g.drawImage(tmp,0,0); g.restore();
+    $('viewTag').textContent='빨갈수록 좌우가 다름'; return;
+  }
+  $('viewTag').textContent=$('viewEx').checked?'선 보기 · 3배 확대':'선 보기';
+  const Q=view.Q, k=$('viewEx').checked?3:1, lw=Math.max(2,view.W/200);
+  g.lineWidth=lw; g.setLineDash([lw*3,lw*2]); g.strokeStyle='rgba(255,255,255,.85)';
+  g.beginPath(); g.moveTo(X(view.x0),0); g.lineTo(X(view.x0),view.H); g.stroke(); g.setLineDash([]);
+  const pair=(a,b,col)=>{ const m={x:(a.x+b.x)/2,y:(a.y+b.y)/2}, dy=(b.y-a.y)/2*k, dx=(b.x-a.x)/2;
+    g.strokeStyle='rgba(255,255,255,.5)'; g.beginPath(); g.moveTo(X(m.x-dx),Y(m.y)); g.lineTo(X(m.x+dx),Y(m.y)); g.stroke();
+    g.strokeStyle=col; g.lineWidth=lw*1.4; g.beginPath(); g.moveTo(X(m.x-dx),Y(m.y-dy)); g.lineTo(X(m.x+dx),Y(m.y+dy)); g.stroke(); g.lineWidth=lw;
+    for(const p of [{x:m.x-dx,y:m.y-dy},{x:m.x+dx,y:m.y+dy}]){ g.fillStyle=col; g.beginPath(); g.arc(X(p.x),Y(p.y),lw*2,0,7); g.fill(); } };
+  const cen=ids=>centroid(ids.map(i=>Q[i]));
+  pair(cen(IDX.rEye),cen(IDX.lEye),VCOL.eye);
+  pair(Q[IDX.rMouth],Q[IDX.lMouth],VCOL.mouth);
+  const side=(p,col)=>{ const ex=view.x0+(p.x-view.x0)*k;
+    g.strokeStyle=col; g.lineWidth=lw*1.4; g.beginPath(); g.moveTo(X(view.x0),Y(p.y)); g.lineTo(X(ex),Y(p.y)); g.stroke(); g.lineWidth=lw;
+    g.fillStyle=col; g.beginPath(); g.arc(X(ex),Y(p.y),lw*2.4,0,7); g.fill(); };
+  side(Q[IDX.noseTip],VCOL.nose); side(Q[IDX.chin],VCOL.chin);
+}
+function renderLegend(){
+  const L=$('viewLegend'); L.innerHTML='';
+  const items=[['eye','눈 높이',2],['mouth','입꼬리 높이',3],['chin','턱끝 치우침',3],['nose','코끝 치우침',3]];
+  for(const [k,name,thr] of items){ const v=lastMM(k), M=METRICS.find(m=>m.k===k), li=document.createElement('li');
+    const txt=v==null?'값 없음':Math.abs(v)<0.3?'거의 같음':`${v>0?M.pos:M.neg} ${Math.abs(v).toFixed(1)}mm`;
+    const pct=v==null?'':` · 남이 알아채기 시작하는 크기(약 ${thr}mm)의 ${Math.round(Math.abs(v)/thr*100)}%`;
+    li.innerHTML=`<i style="background:${VCOL[k]}"></i><span><b>${name}</b>: ${txt}<span class="sub">${pct}</span></span>`; L.appendChild(li); }
+}
+const VIEW_HELP={
+  flick:'원래 얼굴과, 얼굴 중심선으로 뒤집은 얼굴을 번갈아 보여줘요. 좌우가 같으면 가만히 있고, <b>다른 곳은 움직여 보여요.</b> 움직이는 곳이 비대칭인 곳이에요.',
+  lines:'흰 점선 = 얼굴 중심선. 색 선이 가로선보다 기울면 그쪽이 높아요. 코·턱 선은 중심선에서 얼마나 옆으로 갔는지예요. "3배 확대"는 작은 차이를 보기 쉽게 <b>선만</b> 3배로 그린 거예요(얼굴은 그대로).',
+  diff:'얼굴과 뒤집은 얼굴의 밝기 차이를 빨갛게 칠했어요. <b>모양 차이와 함께 조명·그림자 차이도</b> 빨갛게 나오니, 한쪽에서 빛이 오면 그쪽이 빨개질 수 있어요.'
+};
+function setViewMode(m){
+  if(!view) return; view.mode=m; clearInterval(viewTimer); viewTimer=null;
+  for(const b of $('viewModes').querySelectorAll('button')) b.classList.toggle('on',b.dataset.m===m);
+  $('viewExWrap').hidden=m!=='lines'; $('viewHelp').innerHTML=VIEW_HELP[m]; renderLegend();
+  if(m==='flick'){ view.flip=false; viewTimer=setInterval(()=>{ view.flip=!view.flip; drawView(); },750); }
+  drawView();
+}
+$('viewModes').onclick=e=>{ const b=e.target.closest('button'); if(b) setViewMode(b.dataset.m); };
+$('viewMirror').onchange=drawView; $('viewEx').onchange=drawView;
+$('btnView').onclick=buildView;
 function snap(w){
   const c=document.createElement('canvas'); c.width=w; c.height=Math.round(w*video.videoHeight/video.videoWidth);
   c.getContext('2d').drawImage(video,0,0,c.width,c.height); return c;
@@ -1565,7 +1695,7 @@ function finish(s){
   const hasE=burst.every(f=>f.E), sE=hasE?summarize(burst.map(f=>f.E)):null;
   const pick=a=>{ const o={}; for(const k of ['eye','mouth','chin','nose','width','fwPx']) o[k]=median(a.map(m=>m[k])); return o; };
   const mm=burst.map(f=>f.mmpp).filter(v=>v), mmpp=mm.length?median(mm):null;
-  if(it.kind==='normal'||it.kind==='repeat'||it.kind==='extra'){ lastNormalFrame=snap(video.videoWidth); $('btnTruth').disabled=false; }
+  if(it.kind==='normal'||it.kind==='repeat'||it.kind==='extra'){ lastNormalFrame=snap(video.videoWidth); $('btnTruth').disabled=false; $('btnView').disabled=false; }
   let img=''; if(it.kind!=='repeat'&&it.kind!=='clahe'){ try{ img=snap(96).toDataURL('image/jpeg',0.55); }catch(e){} }
   const rec={id:Date.now(), v:5, t:new Date().toISOString(), day:dayNum(), kind:it.kind, tag:it.tag||'', prep:!!it.prep, repeatId:it.repeatId||null,
     m:sA.m, sd:sA.sd, mB:sB.m, sdB:sB.sd, mC:sC.m, sdC:sC.sd, mD:sD.m, sdD:sD.sd, mE:sE?sE.m:null, sdE:sE?sE.sd:null,
