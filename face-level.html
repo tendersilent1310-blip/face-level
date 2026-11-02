@@ -259,7 +259,7 @@ svg text{fill:var(--muted);font-family:var(--font-num);font-size:11px}
       <div class="row">
         <label class="sub" for="showM">계산 방식</label>
         <select id="showM">
-          <option value="E">E 3D 거울 겹치기</option><option value="D">D 3D 보정</option><option value="A">A 미간선</option><option value="B">B 수직선</option><option value="C">C 거울 겹치기</option>
+          <option value="F">F 자세 보정 (시험 중)</option><option value="E">E 3D 거울 겹치기</option><option value="D">D 3D 보정</option><option value="A">A 미간선</option><option value="B">B 수직선</option><option value="C">C 거울 겹치기</option>
         </select>
       </div>
     </div>
@@ -311,6 +311,7 @@ svg text{fill:var(--muted);font-family:var(--font-num);font-size:11px}
       <label class="sub" for="burstN">한 번 측정할 때 찍는 장수</label>
       <select id="burstN"><option>10</option><option selected>20</option><option>30</option></select>
       <button id="btnResetRef">개인 정면 다시 등록</button>
+      <label class="sub"><input type="checkbox" id="autoCsv"> 측정 끝나면 CSV 자동 저장</label>
     </div>
     <div class="row">
       <label class="sub" for="faceCm">내 얼굴 너비(cm)</label>
@@ -650,7 +651,51 @@ function clahe(gray, w, h, tiles, clip){
 }
 
 // ---------- 실험 결과 요약 ----------
-const MK={A:'m',B:'mB',C:'mC',D:'mD',E:'mE'}, METHODS=['A','B','C','D','E'];
+const MK={A:'m',B:'mB',C:'mC',D:'mD',E:'mE',F:'mF'}, METHODS=['A','B','C','D','E'];
+// ---------- F 방식: E + 내 자세 버릇 보정 ----------
+// 책상에 폰을 기대 놓고 재면 날마다 위아래·기울기·좌우 각도가 조금씩 다르다.
+// 내 기록들로 '각도 1°당 숫자가 얼마나 새는지'를 배워서, 오늘 각도가 평소와 다른 만큼 빼 준다.
+const POSE_KEYS=['eye','brow','mouth','chin','nose','width'];
+function solveLin(A,b){ const n=b.length, M=A.map((r,i)=>[...r,b[i]]);
+  for(let i=0;i<n;i++){ let p=i; for(let j=i+1;j<n;j++) if(Math.abs(M[j][i])>Math.abs(M[p][i])) p=j; [M[i],M[p]]=[M[p],M[i]];
+    const d=M[i][i]; if(Math.abs(d)<1e-12) return null; for(let j=i;j<=n;j++) M[i][j]/=d;
+    for(let k=0;k<n;k++) if(k!==i){ const f=M[k][i]; for(let j=i;j<=n;j++) M[k][j]-=f*M[i][j]; } }
+  return M.map(r=>r[n]); }
+const POSE_KINDS={normal:1,repeat:1,clahe:1,extra:1};
+function poseFit(records, skipDay){
+  const R=records.filter(r=>r.mE&&r.cond&&r.cond.pitch!=null&&r.cond.roll!=null&&r.cond.yaw!=null&&POSE_KINDS[r.kind]&&(!skipDay||dayKey(r.t)!==skipDay));
+  if(R.length<20) return null;
+  const c={p:median(R.map(r=>r.cond.pitch)), r:median(R.map(r=>r.cond.roll)), y:median(R.map(r=>r.cond.yaw))};
+  const X=R.map(r=>[1,r.cond.pitch-c.p,r.cond.roll-c.r,r.cond.yaw-c.y]);
+  if(Math.max(sd(X.map(x=>x[1])),sd(X.map(x=>x[2])))<0.8) return null;   // 각도가 거의 안 변했으면 배울 게 없음
+  const lam=100, b={};   // 너무 크게 빼지 않도록 약하게 눌러 줌(릿지)
+  for(const k of POSE_KEYS){
+    const y=R.map(r=>r.mE[k]); if(y.some(v=>v==null)) continue;
+    const A=[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]], v=[0,0,0,0];
+    X.forEach((x,i)=>{ for(let a=0;a<4;a++){ v[a]+=x[a]*y[i]; for(let q=0;q<4;q++) A[a][q]+=x[a]*x[q]; } });
+    for(let a=1;a<4;a++) A[a][a]+=lam;
+    const s0=solveLin(A,v); if(s0) b[k]=s0;
+  }
+  return {c,b,n:R.length,days:new Set(R.map(r=>dayKey(r.t))).size};
+}
+function applyPose(r, fit){
+  if(!fit||!r.mE||!r.cond||r.cond.pitch==null) return null;
+  const m={...r.mE}, dp=r.cond.pitch-fit.c.p, dr=r.cond.roll-fit.c.r, dy=r.cond.yaw-fit.c.y;
+  for(const k in fit.b){ const q=fit.b[k]; m[k]=r.mE[k]-(q[1]*dp+q[2]*dr+q[3]*dy); }
+  m.total=mean([m.eye,m.brow,m.mouth,m.chin,m.width].map(Math.abs)); return m;
+}
+// 다른 날로 배운 보정을 그날에 적용했을 때 날마다 흔들림 (진짜 검증: 자기 날짜를 빼고 학습)
+function poseDailyCV(records){
+  const days=[...new Set(records.filter(r=>r.kind==='normal'&&r.mE&&r.mmpp).map(r=>dayKey(r.t)))];
+  if(days.length<3) return null;
+  const means={}; for(const k of KEY4) means[k]=[];
+  for(const d of days){
+    const fit=poseFit(records,d); if(!fit) return null;
+    const g=records.filter(r=>r.kind==='normal'&&r.mE&&r.mmpp&&dayKey(r.t)===d);
+    for(const k of KEY4) means[k].push(mean(g.map(r=>{ const m=applyPose(r,fit); return m[k]/100*m.fwPx*r.mmpp; })));
+  }
+  return mean(KEY4.map(k=>sd(means[k])));
+}
 // 정면을 1° 잘못 잡았을 때 생기는 가짜 비대칭 (얼굴 너비 대비 %, 표준 얼굴 계산값). 눈·입 높이는 영향 없음
 const SENS_PCT={eye:0, brow:0, mouth:0, chin:0.111, nose:0.255, width:1.75};
 // 정면 불확실성(도): 정면을 여러 번 등록한 값들이 서로 얼마나 다른가. 자료가 없으면 연구 기준 2°
@@ -664,7 +709,7 @@ function frontUncertainty(front, checks){
 }
 // 방향 판정: 값이 (측정 흔들림 + 정면 오차가 만드는 가짜 값)의 2배보다 커야 '어느 쪽'이라고 말한다
 function directionCall(k, pct, sdPct, fuDeg, method){
-  const sens=method==='E'?0:(SENS_PCT[k]||0), U=Math.sqrt((sdPct||0)*(sdPct||0)+(sens*fuDeg)*(sens*fuDeg));
+  const sens=(method==='E'||method==='F')?0:(SENS_PCT[k]||0), U=Math.sqrt((sdPct||0)*(sdPct||0)+(sens*fuDeg)*(sens*fuDeg));
   return {sure:Math.abs(pct)>2*U && Math.abs(pct)>=0.05, U, sign:Math.sign(pct)};
 }
 const KEY4=['eye','mouth','chin','nose'];
@@ -676,7 +721,8 @@ function expSummary(records, truth){
   const out={methods:{}};
   const reps=groupBy(R.filter(r=>r.kind==='repeat'), r=>r.repeatId);
   const days=groupBy(R.filter(r=>r.kind==='normal'), r=>dayKey(r.t));
-  for(const M of METHODS){
+  const MS=METHODS.concat(records.some(r=>r.mF)?['F']:[]);
+  for(const M of MS){
     const rep=[]; for(const g of Object.values(reps)) for(const k of KEY4){ const v=ok(g.map(r=>recMM(r,M,k))); if(v.length>=3) rep.push(sd(v)); }
     let daily=null; const dm=Object.values(days).map(g=>g.filter(r=>r[MK[M]]));
     const dd=dm.filter(g=>g.length);
@@ -687,6 +733,8 @@ function expSummary(records, truth){
   }
   out.n={repeatSets:Object.values(reps).filter(g=>g.length>=3).length, days:Object.keys(days).length, truth:(truth||[]).length};
   let best=null, bs=Infinity;
+  if(out.methods.F){ out.methods.F.daily=poseDailyCV(records); }
+  out.MS=MS;
   for(const M of METHODS){ const v=[out.methods[M].repeat,out.methods[M].daily,out.methods[M].truth,out.methods[M].flip].filter(x=>x!=null); if(v.length){ const sc=mean(v); if(sc<bs){ bs=sc; best=M; } } }
   out.best=best;
   // 흑백 보정 비교: 같은 날 같은 종류끼리의 흔들림 (D 방식)
@@ -806,7 +854,25 @@ function fixRestoredFw(d){
     if(r.mE&&r.mE.fwPx) r.mE.fwPx*=0.993; r.fwFix=1;
   }
 }
-function save(){ try{ localStorage.setItem(DBKEY, JSON.stringify(db)); }catch(e){ setMsg('저장 공간이 부족해요. CSV로 저장한 뒤 오래된 기록이나 사람을 지워 주세요.'); } }
+const NOSAVE={mF:1,sdF:1};
+function dbJSON(){ return JSON.stringify(db,(k,v)=>NOSAVE[k]?undefined:v); }
+function save(){ const j=dbJSON(); try{ localStorage.setItem(DBKEY, j); }catch(e){ setMsg('저장 공간이 부족해요. CSV로 저장한 뒤 오래된 기록이나 사람을 지워 주세요.'); } idbPut(j); }
+// 자동 저장 2중화: 브라우저 저장소(localStorage) + IndexedDB. 한쪽이 비면 다른 쪽에서 자동 복원
+function idbOpen(){ return new Promise((ok,no)=>{ try{ const q=indexedDB.open('face-level',1); q.onupgradeneeded=()=>q.result.createObjectStore('kv'); q.onsuccess=()=>ok(q.result); q.onerror=()=>no(q.error); }catch(e){ no(e); } }); }
+async function idbPut(j){ try{ const d=await idbOpen(); d.transaction('kv','readwrite').objectStore('kv').put(j,'db'); }catch(e){} }
+async function idbGet(){ try{ const d=await idbOpen(); return await new Promise(ok=>{ const q=d.transaction('kv').objectStore('kv').get('db'); q.onsuccess=()=>ok(q.result||null); q.onerror=()=>ok(null); }); }catch(e){ return null; } }
+const countRecs=d=>Object.values(d.profiles||{}).reduce((a,p)=>a+((p&&p.records)||[]).length,0);
+async function autoRestore(){
+  const j=await idbGet(); if(!j) return; let d=null; try{ d=JSON.parse(j); }catch(e){ return; }
+  if(!d||!d.profiles||countRecs(d)<=countRecs(db)) return;
+  for(const id in d.profiles) d.profiles[id]=normProfile(d.profiles[id]);
+  db=d; if(!db.profiles[db.cur]) db.cur=Object.keys(db.profiles)[0]; store=db.profiles[db.cur];
+  try{ localStorage.setItem(DBKEY, dbJSON()); }catch(e){}
+  renderAll(); const m=$('importMsg'); if(m) m.textContent=`브라우저 저장소가 비어 있어서 예비 저장소에서 기록 ${countRecs(db)}개를 자동 복원했어요.`;
+}
+// F 방식(자세 보정) 값은 저장하지 않고 열 때마다 내 기록 전체로 다시 계산
+let poseModel=null;
+function attachPose(){ poseModel=poseFit(store.records); for(const r of store.records){ const m=applyPose(r,poseModel); if(m){ r.mF=m; r.sdF=r.sdE; } else { delete r.mF; delete r.sdF; } } }
 
 // ---------- 상태 ----------
 let landmarker=null, FL=null, files=null, imgLandmarker=null, stream=null, running=false, lastVideoTime=-1;
@@ -1020,7 +1086,9 @@ async function endSession(finished){
   const plan=planFor(dayNum(),store.mode);
   const needTruth=plan.steps.some(s=>s.k==='truth') && !store.truth.some(x=>dayKey(x.t)===today());
   if(needTruth&&lastNormalFrame){ setMsg('측정 끝! 정답 시험을 하는 중이에요…'); await runTruth(); }
-  setMsg('오늘 측정 끝! 수고했어요. CSV로 저장해 두세요.');
+  let auto='';
+  if(db.autoCsv!==false){ try{ attachPose(); download(csvFor([store]),`얼굴수평계_${store.name}_${today()}.csv`); auto=' CSV도 자동으로 저장했어요(다운로드 폴더).'; }catch(e){} }
+  setMsg('오늘 측정 끝! 수고했어요.'+auto);
   speak('오늘 측정 끝. 수고했어요',true);
   renderToday(); renderSummary();
 }
@@ -1370,6 +1438,13 @@ function finishFront(){
     tries:T.map(x=>({yaw:+x.yaw.toFixed(2),pitch:+x.pitch.toFixed(2),roll:+x.roll.toFixed(2)})),dropped:allTries.filter(x=>!T.includes(x)).map(x=>({yaw:+x.yaw.toFixed(2),pitch:+x.pitch.toFixed(2)})),spreadYaw:rng('yaw'),spreadPitch:rng('pitch'),t:new Date().toISOString()};
   store.ref={v:3,size:m3('size'),cx:m3('cx'),cy:m3('cy'),yaw:store.front.yaw,pitch:store.front.pitch,roll:store.front.roll,cam:$('camSel').value,t:store.front.t};
   frontTries=[]; save();
+  const prevRec=[...store.records].reverse().find(r=>r.front&&r.front.pitch!=null&&r.front.t!==store.front.t);
+  const prevP=store.frontHistory&&store.frontHistory.length?store.frontHistory[store.frontHistory.length-1].pitch:(prevRec?prevRec.front.pitch:null);
+  if(prevP!=null&&Math.abs(store.front.pitch-prevP)>3){
+    const dp=store.front.pitch-prevP;
+    store.coach={t:new Date().toISOString(), text:`새 정면의 위아래 각도가 지난번보다 ${Math.abs(dp).toFixed(1)}° ${dp>0?'아래(폰이 낮거나 턱을 당김)':'위(폰이 높거나 턱을 듦)'}예요. F 방식이 보정하지만, 다음엔 폰을 지난번 높이에 가깝게 두면 더 정확해요.`}; save();
+    speak('폰 높이가 지난번과 달라요. 기록해 둘게요',true);
+  }
   const sp=Math.max(store.front.spreadYaw,store.front.spreadPitch);
   speak(sp<=2?'정면 등록 완료. 세 번이 거의 같았어요':'정면 등록 완료. 세 번이 조금씩 달랐어요. 기록해 둘게요',true);
   renderAll(); nextItem();
@@ -1428,7 +1503,7 @@ function renderLatest(){
     if(d.pos){
       const dc=directionCall(d.k, v, sdv?sdv[d.k]:0, fu.deg, M);
       // 다른 방식(D↔E)과 방향이 반대면 역시 '구분 불가'
-      const O=M==='E'?'D':'E', om=r[MK[O]], osd=r['sd'+O];
+      const O=(M==='E'||M==='F')?'D':'E', om=r[MK[O]], osd=r['sd'+O];
       const oc=om&&om[d.k]!=null?directionCall(d.k, om[d.k], osd?osd[d.k]:0, fu.deg, O):null;
       const clash=oc&&oc.sure&&dc.sure&&oc.sign!==dc.sign;
       if(Math.abs(v)<0.05) t='거의 같음';
@@ -1444,15 +1519,15 @@ function renderLatest(){
     box.appendChild(el);
   }
   { const p=document.createElement('div'); p.className='note';
-    p.textContent=`계산 방식 ${M}${M==='E'?' (정면 등록과 무관)':''} · 정면 오차 ±${fu.deg.toFixed(1)}°${fu.basis==='measured'?` (등록 ${fu.n}번 비교)`:' (아직 비교 자료 없음, 연구 기준값)'}. 방향은 값이 오차의 2배를 넘을 때만 표시해요. 눈·입꼬리 높이는 정면 오차의 영향을 거의 안 받아요.`;
+    p.textContent=`계산 방식 ${M}${M==='E'?' (정면 등록과 무관)':M==='F'?` (정면 무관 + 각도 버릇 보정, 기록 ${poseModel?poseModel.n:0}개로 학습)`:''} · 정면 오차 ±${fu.deg.toFixed(1)}°${fu.basis==='measured'?` (등록 ${fu.n}번 비교)`:' (아직 비교 자료 없음, 연구 기준값)'}. 방향은 값이 오차의 2배를 넘을 때만 표시해요. 눈·입꼬리 높이는 정면 오차의 영향을 거의 안 받아요.`;
     $('methodBox').appendChild(p); }
   if(r.mB&&r.mC&&r.mD){
     const t=document.createElement('table'); const h=t.createTHead().insertRow();
-    ['항목','A 미간선','B 수직선','C 거울 겹치기','D 3D 보정','E 3D 거울'].forEach(x=>{const th=document.createElement('th'); th.textContent=x; h.appendChild(th);});
+    ['항목','A 미간선','B 수직선','C 거울 겹치기','D 3D 보정','E 3D 거울','F 자세 보정'].forEach(x=>{const th=document.createElement('th'); th.textContent=x; h.appendChild(th);});
     const b=t.createTBody();
     for(const k of KEYS6){
       const d=METRICS.find(x=>x.k===k), tr=b.insertRow(); const c0=tr.insertCell(); c0.textContent=d.name; c0.className='lbl';
-      for(const mm of [r.m,r.mB,r.mC,r.mD,r.mE]){ if(!mm){ tr.insertCell().textContent='—'; continue; } const x=k!=='width'?toMM(r,mm[k],mm):null; tr.insertCell().textContent= x!=null?fmt(x,1)+'mm':fmt(mm[k],2)+'%'; }
+      for(const mm of [r.m,r.mB,r.mC,r.mD,r.mE,r.mF]){ if(!mm){ tr.insertCell().textContent='—'; continue; } const x=k!=='width'?toMM(r,mm[k],mm):null; tr.insertCell().textContent= x!=null?fmt(x,1)+'mm':fmt(mm[k],2)+'%'; }
     }
     const cap=t.createCaption(); cap.className='note';
     cap.textContent=`같은 사진을 다섯 가지 방식으로 계산한 값이에요. E는 얼굴 자체의 대칭면을 찾아서 정면 등록이 틀려도 흔들리지 않아요. 여럿이 비슷하면 계산 방식에 따라 답이 흔들리지 않는다는 뜻이에요.${r.level!=null?` 폰 기울기 ${r.level}°.`:''}`;
@@ -1471,13 +1546,14 @@ function renderSummary(){
   if(!S.n.days&&!S.n.repeatSets&&!S.n.truth){ const p=document.createElement('div'); p.className='note'; p.textContent='측정이 쌓이면 여기에 실험 결과가 정리돼요. 합격선은 모두 0.5mm예요.'; box.appendChild(p); box.appendChild(frontReport()); renderPeopleSummary(box); return; }
   // 방식별 핵심 결과
   const t=document.createElement('table'); const h=t.createTHead().insertRow();
-  ['검사 (합격 0.5mm)','A 미간선','B 수직선','C 거울 겹치기','D 3D 보정','E 3D 거울'].forEach(x=>{const th=document.createElement('th'); th.textContent=x; h.appendChild(th);});
+  const NAMES={A:'A 미간선',B:'B 수직선',C:'C 거울 겹치기',D:'D 3D 보정',E:'E 3D 거울',F:'F 자세 보정(시험)'};
+  ['검사 (합격 0.5mm)',...S.MS.map(M=>NAMES[M])].forEach(x=>{const th=document.createElement('th'); th.textContent=x; h.appendChild(th);});
   const b=t.createTBody();
   const rows=[['repeat',`반복 흔들림 (${S.n.repeatSets}세트)`],['daily',`날마다 흔들림 (${S.n.days}일, 3일부터)`],['truth',`정답 시험 오차 (${S.n.truth}회)`],['flip','좌우 뒤집기 치우침']];
-  for(const [k,label] of rows){ const tr=b.insertRow(); const c0=tr.insertCell(); c0.textContent=label; c0.className='lbl'; for(const M of METHODS) cellMM(tr.insertCell(), S.methods[M][k]); }
-  for(const M of METHODS) if(M===S.best){ const i=METHODS.indexOf(M)+1; h.cells[i].textContent='★ '+h.cells[i].textContent; }
+  for(const [k,label] of rows){ const tr=b.insertRow(); const c0=tr.insertCell(); c0.textContent=label; c0.className='lbl'; for(const M of S.MS) cellMM(tr.insertCell(), S.methods[M][k]); }
+  for(const M of S.MS) if(M===S.best){ const i=S.MS.indexOf(M)+1; h.cells[i].textContent='★ '+h.cells[i].textContent; }
   const cap=t.createCaption(); cap.className='note';
-  cap.textContent=`눈·입꼬리·턱끝·코끝 4항목 평균. 흔들림은 표준편차, 정답 오차는 턱끝을 1·2·3mm 옮겼을 때 틀린 양, 뒤집기 치우침은 사진을 좌우로 뒤집었을 때 값이 정확히 반대로 안 나온 양(계산이 한쪽으로 기우는 버릇)이에요.${S.best?` ★ 지금까지 가장 좋은 방식: ${S.best}.`:''}`;
+  cap.textContent=`눈·입꼬리·턱끝·코끝 4항목 평균. 흔들림은 표준편차, 정답 오차는 턱끝을 1·2·3mm 옮겼을 때 틀린 양, F의 '날마다 흔들림'은 그날을 빼고 다른 날로만 배운 보정을 적용한 값이라 진짜 검증이에요. 뒤집기 치우침은 사진을 좌우로 뒤집었을 때 값이 정확히 반대로 안 나온 양(계산이 한쪽으로 기우는 버릇)이에요.${S.best?` ★ 지금까지 가장 좋은 방식: ${S.best}.`:''}`;
   const w=document.createElement('div'); w.className='tablewrap'; w.appendChild(t); box.appendChild(w);
   // 흑백 보정 비교
   if(S.clahe.on!=null&&S.clahe.off!=null){
@@ -1544,7 +1620,7 @@ function renderHist(){
     const mid=document.createElement('div');
     const t=document.createElement('div'); t.className='t'; t.textContent=new Date(r.t).toLocaleString('ko-KR')+` · ${KIND_NAME[r.kind]||'이전 버전 측정'}${r.tag?' ('+r.tag+')':''}`;
     const s=document.createElement('div'); s.className='s';
-    const HM=r.mE?'E':'D', mm=k=>{ const v=recMM(r,HM,k); return v==null?'—':fmt(v,1); };
+    const HM=r.mF?'F':r.mE?'E':'D', mm=k=>{ const v=recMM(r,HM,k); return v==null?'—':fmt(v,1); };
     s.textContent= r.mD&&r.mmpp ? `${HM} 방식 · 턱끝 ${mm('chin')} · 눈 ${mm('eye')} · 입 ${mm('mouth')} · 코 ${mm('nose')} (mm)` : `턱끝 ${fmt(r.m.chin,2)}% · 눈 ${fmt(r.m.eye,2)}%`;
     mid.append(t,s);
     const del=document.createElement('button'); del.textContent='삭제'; del.className='danger';
@@ -1557,7 +1633,7 @@ function renderRef(){
   if(store.front){ const fu=frontUncertainty(store.front, store.frontChecks); tag.className='tag '+(fu.basis!=='measured'||fu.deg<=2?'ok':'warn'); tag.textContent=`${store.name}의 정면 등록됨 · 좌우 ${store.front.yaw.toFixed(1)}° 위아래 ${store.front.pitch.toFixed(1)}° · 오차 ±${fu.deg.toFixed(1)}°`; }
   else { tag.className='tag warn'; tag.textContent='개인 정면 미등록 (측정 시작 때 먼저 해요)'; }
 }
-function renderAll(){ try{ storageStatus(); }catch(e){} const eh=$('emptyHint'); if(eh) eh.hidden=Object.values(db.profiles).some(p=>p.records.length); renderPeople(); renderToday(); renderLatest(); renderSummary(); renderTrend(); renderHist(); renderRef(); }
+function renderAll(){ try{ storageStatus(); }catch(e){} try{ attachPose(); }catch(e){} const eh=$('emptyHint'); if(eh) eh.hidden=Object.values(db.profiles).some(p=>p.records.length); renderPeople(); renderToday(); renderLatest(); renderSummary(); renderTrend(); renderHist(); renderRef(); }
 
 $('btnResetRef').onclick=()=>{ if(store.front){ store.frontHistory=store.frontHistory||[]; store.frontHistory.push({...store.front, checks:store.frontChecks, ended:new Date().toISOString()}); } store.ref=null; store.front=null; store.frontChecks=[]; save(); renderAll(); };
 $('btnClear').onclick=()=>{ $('clearConfirm').hidden=false; };
@@ -1613,7 +1689,7 @@ const csvq=v=>{ const s=String(v??''); return /[",\n]/.test(s)?'"'+s.replace(/"/
 function csvFor(profiles){
   const keys=METRICS.map(d=>d.k);
   const head=['사람','실험종류','정면_좌우','정면_위아래','정면_기울기','정면3회_좌우차이','정면3회_위아래차이','정면오차_도','시간','날짜','실험일차','종류','조건','흑백보정','반복ID','카메라','mm_per_px','폰기울기','yaw','pitch','roll','size','조명_좌우','조명_밝기','잠','술','짠음식','메모'];
-  const sets=[['A','m','sd'],['B','mB','sdB'],['C','mC','sdC'],['D','mD','sdD'],['E','mE','sdE']];
+  const sets=[['A','m','sd'],['B','mB','sdB'],['C','mC','sdC'],['D','mD','sdD'],['E','mE','sdE'],['F','mF','sdF']];
   for(const [n] of sets) for(const k of keys) head.push(n+'_'+k, n+'_'+k+'_sd');
   for(const [n] of sets) head.push(n+'_fwPx');
   const EF=['eye','mouth','chin','nose','width','fwPx'];
@@ -1655,6 +1731,7 @@ function download(text, name){
   setTimeout(()=>URL.revokeObjectURL(a.href),2000);
 }
 $('btnCsv').onclick=()=>download(csvFor([store]),`얼굴수평계_${store.name}_${today()}.csv`);
+$('autoCsv').checked=db.autoCsv!==false; $('autoCsv').onchange=()=>{ db.autoCsv=$('autoCsv').checked; save(); };
 $('btnImport').onclick=()=>$('fileImport').click();
 $('fileImport').onchange=async e=>{
   const f=e.target.files[0]; e.target.value=''; if(!f) return;
@@ -1680,6 +1757,7 @@ async function storageStatus(){
   el.textContent=`이 브라우저에 저장된 기록 ${n}개 (${days}일) · 보관: ${persisted?'영구 ✓':'임시 (브라우저가 지울 수 있음)'} · ${app?'앱으로 열림 ✓':'브라우저 탭으로 열림'}`;
 }
 storageStatus();
+autoRestore();
 $('btnCsvAll').onclick=()=>download(csvFor(Object.values(db.profiles)),`얼굴수평계_모든사람_${today()}.csv`);
 
 // ---------- 정답 시험 ----------
