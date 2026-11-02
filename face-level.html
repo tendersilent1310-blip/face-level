@@ -143,6 +143,7 @@ svg text{fill:var(--muted);font-family:var(--font-num);font-size:11px}
     <div class="sub" id="engineState">준비 전</div>
   </header>
 
+  <div class="confirm" id="inappWarn" hidden style="margin-bottom:12px"><span><b>카톡·인스타 같은 앱 안에서 열렸어요.</b> 여기서는 기록이 지워질 수 있어요. 아래 버튼으로 크롬에서 열어 주세요.</span><button class="primary" id="btnOpenChrome">크롬에서 열기</button></div>
   <section class="panel" aria-label="측정 대상">
     <div class="row" style="justify-content:space-between">
       <div class="row">
@@ -605,6 +606,8 @@ function summarize(frames){
 }
 function verdict(sdPct){ if (sdPct<=0.3) return ['ok','안정']; if (sdPct<=0.7) return ['warn','보통']; return ['bad','흔들림 큼']; }
 
+// ---------- 앱 안 브라우저 감지 (카톡 등은 기록이 지워지기 쉬움) ----------
+function inAppBrowser(ua){ return /KAKAOTALK|NAVER\(inapp|Instagram|FBAN|FBAV|Line\/|DaumApps|everytimeApp|; wv\)/i.test(ua||''); }
 // ---------- 실험 계획 (4주) ----------
 function dayKey(t){ const d=new Date(t); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 const W2=[['고개 좌우 2°','고개 좌우 4°','고개 좌우 6°'],['끄덕임 위','끄덕임 아래'],['더 가까이','더 멀리'],['측면 조명','옆으로 기울임'],['살짝 웃음','안경'],['다른 폰'],['저녁 시간']];
@@ -1784,6 +1787,10 @@ function download(text, name){
   setTimeout(()=>URL.revokeObjectURL(a.href),2000);
 }
 $('btnCsv').onclick=()=>download(csvFor([store]),`얼굴수평계_${store.name}_${today()}.csv`);
+if(inAppBrowser(navigator.userAgent)){ $('inappWarn').hidden=false; $('btnOpenChrome').onclick=()=>{ const u=location.href, ua=navigator.userAgent;
+  if(/KAKAOTALK/i.test(ua)) location.href='kakaotalk://web/openExternal?url='+encodeURIComponent(u);
+  else if(/Android/i.test(ua)) location.href='intent://'+u.replace(/^https?:\/\//,'')+'#Intent;scheme=https;package=com.android.chrome;end';
+  else { try{ navigator.clipboard.writeText(u); }catch(e){} alert('주소를 복사했어요. 사파리나 크롬에 붙여 넣어 열어 주세요.'); } }; }
 $('setupSel').value=db.setup||'hand'; $('setupSel').onchange=()=>{ db.setup=$('setupSel').value; save(); };
 $('autoCsv').checked=db.autoCsv!==false; $('autoCsv').onchange=()=>{ db.autoCsv=$('autoCsv').checked; save(); };
 $('btnImport').onclick=()=>$('fileImport').click();
