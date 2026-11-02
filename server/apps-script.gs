@@ -32,5 +32,20 @@ function doPost(e) {
     return out({ ok: false, err: String(err) });
   }
 }
-function doGet() { return out({ ok: true, hello: '얼굴 수평계 시트 연결 OK' }); }
+// ▼ 읽기 문 비밀번호: 아래 따옴표 안을 형만 아는 비밀번호로 바꾸세요 (이 코드는 시트 안에만 있고 공개되지 않아요)
+var READ_KEY = '여기에-비밀번호';
+
+// 비밀번호가 맞으면 모든 탭을 CSV로 돌려줘요 (분석용). 틀리면 인사만.
+function doGet(e) {
+  var key = e && e.parameter && e.parameter.key;
+  if (!key || READ_KEY === '여기에-비밀번호' || key !== READ_KEY) return out({ ok: true, hello: '얼굴 수평계 시트 연결 OK' });
+  var ss = SpreadsheetApp.getActiveSpreadsheet(), tabs = {};
+  ss.getSheets().forEach(function (sh) {
+    var v = sh.getDataRange().getDisplayValues();
+    tabs[sh.getName()] = v.map(function (r) {
+      return r.map(function (c) { c = String(c); return /[",\n]/.test(c) ? '"' + c.replace(/"/g, '""') + '"' : c; }).join(',');
+    }).join('\n');
+  });
+  return out({ ok: true, tabs: tabs, t: new Date() });
+}
 function out(o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }
