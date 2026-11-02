@@ -143,6 +143,14 @@ svg text{fill:var(--muted);font-family:var(--font-num);font-size:11px}
     <div class="sub" id="engineState">준비 전</div>
   </header>
 
+  <section class="panel" id="regBox" hidden aria-label="처음 등록">
+    <h2>반가워요! 먼저 이름을 정해 주세요</h2>
+    <div class="note">진짜 이름 대신 <b>별명</b>도 괜찮아요. 측정 결과가 이 이름으로 정리돼요.</div>
+    <div class="row"><input type="text" id="regName" maxlength="20" placeholder="예: 용준, 엄마, 참가자7"></div>
+    <label class="sub"><input type="checkbox" id="regShare" checked> 측정 숫자(사진 없음)를 실험 운영자의 구글 시트에 저장하는 데 동의해요. 언제든 끌 수 있어요.</label>
+    <div class="row"><button class="primary big" id="regOk" disabled>시작하기</button></div>
+    <div class="note">사진은 폰 밖으로 절대 나가지 않아요. 얼굴 위치를 잰 숫자만 보내요.</div>
+  </section>
   <div class="confirm" id="installBox" hidden style="margin-bottom:12px"><span><b>앱으로 설치하면</b> 기록이 더 잘 남고, 홈 화면에서 바로 열려요.</span><button class="primary" id="btnInstall">📲 앱 설치</button></div>
   <div class="confirm" id="inappWarn" hidden style="margin-bottom:12px"><span><b>카톡·인스타 같은 앱 안에서 열렸어요.</b> 여기서는 기록이 지워질 수 있어요. 아래 버튼으로 크롬에서 열어 주세요.</span><button class="primary" id="btnOpenChrome">크롬에서 열기</button></div>
   <section class="panel" aria-label="측정 대상">
@@ -1704,7 +1712,7 @@ function renderRef(){
   if(store.front){ const fu=frontUncertainty(store.front, store.frontChecks); tag.className='tag '+(fu.basis!=='measured'||fu.deg<=2?'ok':'warn'); tag.textContent=`${store.name}의 정면 등록됨 · 좌우 ${store.front.yaw.toFixed(1)}° 위아래 ${store.front.pitch.toFixed(1)}° · 오차 ±${fu.deg.toFixed(1)}°`; }
   else { tag.className='tag warn'; tag.textContent='개인 정면 미등록 (측정 시작 때 먼저 해요)'; }
 }
-function renderAll(){ try{ storageStatus(); }catch(e){} try{ attachPose(); }catch(e){} const eh=$('emptyHint'); if(eh) eh.hidden=Object.values(db.profiles).some(p=>p.records.length); renderPeople(); renderToday(); try{ fillFree(); freeHint(); }catch(e){} try{ renderSheet(); }catch(e){} renderLatest(); renderSummary(); renderTrend(); renderHist(); renderRef(); }
+function renderAll(){ try{ storageStatus(); }catch(e){} try{ attachPose(); }catch(e){} const eh=$('emptyHint'); if(eh) eh.hidden=Object.values(db.profiles).some(p=>p.records.length); renderPeople(); renderToday(); try{ fillFree(); freeHint(); }catch(e){} try{ renderSheet(); }catch(e){} try{ showReg(); }catch(e){} renderLatest(); renderSummary(); renderTrend(); renderHist(); renderRef(); }
 
 $('btnResetRef').onclick=()=>{ if(store.front){ store.frontHistory=store.frontHistory||[]; store.frontHistory.push({...store.front, checks:store.frontChecks, ended:new Date().toISOString()}); } store.ref=null; store.front=null; store.frontChecks=[]; save(); renderAll(); };
 $('btnClear').onclick=()=>{ $('clearConfirm').hidden=false; };
@@ -1825,6 +1833,15 @@ function renderSheet(){
   $('sheetAsk').hidden=!(on&&store.shareOK==null&&store.records.length);
   if(!$('sheetAsk').hidden) $('sheetAskWho').textContent=store.name;
 }
+const DEFAULT_SHEET='AKfycbzl-dTldUwZQE6asTTVRRIjvrij3F70xZQPADn2v7Y4bTTLAMrCWm7KkSz4kCA0w1Oj';
+if(db.sheetId===undefined){ db.sheetId=DEFAULT_SHEET; save(); }
+function needReg(){ return !db.registered && !Object.values(db.profiles).some(p=>p.records.length); }
+if(!db.registered && !needReg()){ db.registered=true; save(); }
+function showReg(){ const on=needReg(); $('regBox').hidden=!on; if(on){ $('regName').value=''; setTimeout(()=>{ try{ $('regBox').scrollIntoView({block:'start'}); $('regName').focus(); }catch(e){} },300); } }
+$('regName').oninput=()=>{ $('regOk').disabled=!$('regName').value.trim(); };
+$('regOk').onclick=()=>{ const n=$('regName').value.trim().slice(0,20); if(!n) return;
+  store.name=n; store.shareOK=$('regShare').checked; store.consent=store.consent||new Date().toISOString();
+  db.registered=true; save(); $('regBox').hidden=true; renderAll(); setMsg(`${n}님, 등록됐어요! 이제 "오늘 측정 시작"을 누르세요.`+(store.shareOK?' 측정이 끝나면 결과가 자동으로 저장돼요.':'')); };
 (function(){ const m=location.hash.match(/[#&]s=([\w-]{20,})/); if(m){ db.sheetId=m[1]; save(); window.history.replaceState(null,'',location.pathname+location.search); } })();
 $('sheetYes').onclick=async()=>{ store.shareOK=true; save(); $('sheetAsk').hidden=true; renderSheet(); const r=await sendSheet(true); setMsg(r==='ok'?'시트로 보냈어요.':'시트로 못 보냈어요. 인터넷을 확인하고 "지금 시트로 보내기"를 눌러 주세요.'); };
 $('sheetNo').onclick=()=>{ store.shareOK=false; save(); $('sheetAsk').hidden=true; renderSheet(); };
