@@ -44,6 +44,10 @@ h2{font-size:15px;margin:0;font-weight:600}
 .stage video,.stage canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
 .stage.mirror video,.stage.mirror canvas{transform:scaleX(-1)}
 .stage .msg{position:absolute;left:0;right:0;bottom:0;padding:14px 16px;background:linear-gradient(transparent,rgba(0,0,0,.78));color:#fff;font-weight:600;font-size:18px;text-align:center}
+.stage .restcover{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:#0d2733;color:#fff;text-align:center;padding:20px}
+.stage .restcover[hidden]{display:none}
+.stage .restcover b{font-size:64px;line-height:1}
+.stage .restcover button{font-size:16px;padding:10px 18px;border-radius:999px;background:#fff;color:#0d2733;border:0;font-weight:700}
 .stage .step-badge{position:absolute;left:12px;top:12px;background:rgba(0,0,0,.6);color:#fff;font-size:13px;font-weight:600;padding:5px 10px;border-radius:999px}
 .stage .start{position:absolute;inset:0;display:grid;place-items:center;align-content:center;gap:10px;color:#fff;text-align:center;padding:20px}
 .ring{position:absolute;top:12px;right:12px;width:54px;height:54px}
@@ -215,6 +219,7 @@ svg text{fill:var(--muted);font-family:var(--font-num);font-size:11px}
           <video id="video" playsinline muted></video>
           <canvas id="overlay"></canvas>
           <div class="step-badge" id="stepBadge" hidden></div>
+          <div class="restcover" id="restCover" hidden><div>😌 눈을 감고 쉬세요</div><b id="restSec">10</b><div class="sub" style="color:#cfe">눈을 굴리거나 먼 곳을 봐도 좋아요</div><button id="btnRestSkip">바로 계속</button></div>
           <svg class="ring" id="ring" viewBox="0 0 54 54" hidden>
             <circle cx="27" cy="27" r="22" fill="none" stroke="rgba(255,255,255,.3)" stroke-width="5"/>
             <circle id="ringArc" cx="27" cy="27" r="22" fill="none" stroke="#3CC79C" stroke-width="5" stroke-linecap="round" stroke-dasharray="138.2" stroke-dashoffset="138.2" transform="rotate(-90 27 27)"/>
@@ -1133,11 +1138,29 @@ $('btnGo').onclick=async()=>{
   $('stage').scrollIntoView({behavior:'smooth',block:'center'});
   announce(q[0],true); renderToday();
 };
+// ---------- 쉬는 시간: 5번 잴 때마다 10초 ----------
+const BREAK_EVERY=5, BREAK_SEC=10; let breakTimer=null;
+function startBreak(item){
+  phase='break'; holdStart=0; burst=[]; setRing(0);
+  let left=BREAK_SEC; $('restSec').textContent=left; $('restCover').hidden=false; setMsg('');
+  speak('잘했어요. 눈을 감고 10초 쉬세요',true);
+  clearInterval(breakTimer);
+  breakTimer=setInterval(()=>{ left--; $('restSec').textContent=Math.max(0,left); if(left<=0) endBreak(item); },1000);
+}
+function endBreak(item){
+  clearInterval(breakTimer); breakTimer=null; $('restCover').hidden=true;
+  if(!session||phase!=='break') return;
+  phase='rest'; rearmAt=performance.now()+2500; holdStart=0;
+  announce(item||session.queue[session.i],false);
+}
+$('btnRestSkip').onclick=()=>endBreak();
 function nextItem(){
   const prev=session.queue[session.i];
   session.i++;
   if(session.i>=session.queue.length){ endSession(true); return; }
   const item=session.queue[session.i], changed=item.kind!==prev.kind||item.tag!==prev.tag||item.try!==prev.try;
+  session.sinceBreak=(session.sinceBreak||0)+1;
+  if(session.sinceBreak>=BREAK_EVERY){ session.sinceBreak=0; startBreak(item); return; }
   phase='rest'; rearmAt=performance.now()+(changed?3500:1800); holdStart=0;
   if(changed) announce(item,false); else { $('stepBadge').textContent=`${item.label} · ${session.i+1}/${session.queue.length}`; }
 }
@@ -1155,6 +1178,7 @@ function coachText(sess){
 async function endSession(finished){
   const sess=session; if(sess){ const c=coachText(sess); if(c){ store.coach={t:new Date().toISOString(), text:c}; save(); } }
   renderHud(null,[],false);
+  clearInterval(breakTimer); breakTimer=null; $('restCover').hidden=true;
   phase='idle'; session=null; reg=null; setRing(0); $('stepBadge').hidden=true; renderPeople();
   renderToday();
   if(!finished){ setMsg('멈췄어요. 이어서 하려면 위의 버튼을 누르세요.'); return; }
@@ -1463,6 +1487,7 @@ function step(res){
   const now=performance.now();
   if(phase==='idle'){ setRing(0); return; }
   if(phase==='aim'&&session){ session.aimFrames=(session.aimFrames||0)+1; if(!allOk){ const b=list.find(c=>!c.ok); if(b&&b.key!=='away'){ session.fails=session.fails||{}; session.fails[b.key]=(session.fails[b.key]||0)+1; } } }
+  if(phase==='break'){ setRing(0); return; }
   if(phase==='rest'){
     if(now>=rearmAt){ phase='aim'; holdStart=0; }
     else { setMsg(`다음 측정 준비… ${Math.ceil((rearmAt-now)/1000)}초`); return; }
