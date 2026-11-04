@@ -353,7 +353,7 @@ svg text{fill:var(--muted);font-family:var(--font-num);font-size:11px}
       <div class="row">
         <button id="btnCsv">CSV로 저장</button>
         <button id="btnImport">CSV 불러오기</button>
-        <input type="file" id="fileImport" accept=".csv,text/csv,text/plain" hidden>
+        <input type="file" id="fileImport" hidden>
         <button id="btnCsvAll">모든 사람 CSV</button>
         <button class="danger" id="btnClear">기록 지우기</button>
       </div>
@@ -2092,15 +2092,23 @@ $('btnImport').onclick=()=>$('fileImport').click();
 $('fileImport').onchange=async e=>{
   const f=e.target.files[0]; e.target.value=''; if(!f) return;
   try{
-    const imp=importFromCsv(await f.text()); let added=0, people=[];
-    for(const [name,P] of Object.entries(imp)){
+    const text=await f.text();
+    if(!/시간/.test(text.slice(0,3000))||!/종류/.test(text.slice(0,3000))) throw new Error('얼굴 수평계 CSV가 아니에요. 다운로드 폴더의 "얼굴수평계_….csv" 파일을 골라 주세요');
+    const imp=importFromCsv(text), E=Object.entries(imp).filter(([,P])=>P.records.length||P.truth.length);
+    if(!E.length) throw new Error('파일 안에 측정 기록이 없어요(빈 파일). 다른 날짜의 CSV를 골라 주세요');
+    let added=0, people=[], target=null;
+    if(E.length===1&&(!store.records.length||!Object.values(db.profiles).some(q=>q.name===E[0][0]))){
+      // 지금 칸이 비어 있거나(초기화된 폰) 파일 속 이름의 칸이 따로 없으면, 지금 칸으로 이어 붙인다
+      added=mergeImported(store,E[0][1]); restoreFront(store); people.push(`${E[0][0]} → ${store.name}`); target=db.cur;
+    } else for(const [name,P] of E){
       let id=Object.keys(db.profiles).find(k=>db.profiles[k].name===name);
       if(!id){ id='p'+Date.now()+Math.floor(Math.random()*1000); db.profiles[id]=normProfile({created:P.records[0]?.t, consent:true},name,P.mode); }
-      added+=mergeImported(db.profiles[id],P); people.push(name);
+      added+=mergeImported(db.profiles[id],P); restoreFront(db.profiles[id]); people.push(name); if(!target) target=id;
     }
-    save(); renderAll();
-    $('importMsg').textContent=`불러오기 완료: ${people.join(', ')} · 새로 추가 ${added}개 (이미 있던 건 건너뜀). 옛 CSV에서 온 mm 값은 약간의 근사가 있어요.`;
-  }catch(err){ $('importMsg').textContent='불러오지 못했어요: '+(err&&err.message||err); }
+    save(); if(target&&target!==db.cur) switchTo(target); else renderAll();
+    const msg=`불러오기 완료: ${people.join(', ')} · 새로 추가 ${added}개 (이미 있던 건 건너뜀) · 기록 ${store.records.length}개, 오늘은 ${dayNum()}일차예요.`;
+    $('importMsg').textContent=msg; setMsg(msg); store.sheetSentN=null;
+  }catch(err){ const m='불러오지 못했어요: '+(err&&err.message||err); $('importMsg').textContent=m; setMsg(m); }
 };
 try{ if('serviceWorker' in navigator && location.protocol==='https:') navigator.serviceWorker.register('sw.js'); }catch(e){}
 // 저장 상태 표시: 기록이 몇 개 있는지, 브라우저가 지우지 않게 '영구 보관' 허락을 받았는지
