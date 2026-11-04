@@ -352,13 +352,13 @@ svg text{fill:var(--muted);font-family:var(--font-num);font-size:11px}
       <h2>기록</h2>
       <div class="row">
         <button id="btnCsv">CSV로 저장</button>
-        <button id="btnImport">CSV 불러오기</button>
-        <input type="file" id="fileImport" hidden>
+        <button id="btnImport">CSV 불러오기 (여러 개 한 번에)</button>
+        <input type="file" id="fileImport" multiple hidden>
         <button id="btnCsvAll">모든 사람 CSV</button>
         <button class="danger" id="btnClear">기록 지우기</button>
       </div>
     </div>
-    <div class="note">기록은 이 브라우저에만 있어요. 측정이 끝나면 CSV로 저장해 두세요. 다른 브라우저나 폰으로 옮길 때는 그 CSV를 "CSV 불러오기"로 넣으면 이어져요.</div>
+    <div class="note">기록은 이 브라우저에만 있어요. 측정이 끝나면 CSV로 저장해 두세요. 다른 브라우저나 폰으로 옮길 때는 "CSV 불러오기"에서 다운로드 폴더의 <b>얼굴수평계 파일을 전부 골라</b> 넣으면 돼요(길게 눌러 여러 개 선택). 앱이 날짜 순서로 알아서 합치고 겹치는 건 건너뛰어요.</div>
     <div class="note" id="storeState"></div>
     <div class="memo" id="sheetBox">
       <div class="row" style="justify-content:space-between"><b>구글 시트로 보내기</b><span class="tag" id="sheetTag">연결 안 됨</span></div>
@@ -2090,25 +2090,33 @@ $('breakSel').value=String(breakSec()); $('breakSel').onchange=()=>{ db.breakSec
 $('autoCsv').checked=db.autoCsv!==false; $('autoCsv').onchange=()=>{ db.autoCsv=$('autoCsv').checked; save(); };
 $('btnImport').onclick=()=>$('fileImport').click();
 $('fileImport').onchange=async e=>{
-  const f=e.target.files[0]; e.target.value=''; if(!f) return;
-  try{
-    const text=await f.text();
-    if(!/시간/.test(text.slice(0,3000))||!/종류/.test(text.slice(0,3000))) throw new Error('얼굴 수평계 CSV가 아니에요. 다운로드 폴더의 "얼굴수평계_….csv" 파일을 골라 주세요');
-    const imp=importFromCsv(text), E=Object.entries(imp).filter(([,P])=>P.records.length||P.truth.length);
-    if(!E.length) throw new Error('파일 안에 측정 기록이 없어요(빈 파일). 다른 날짜의 CSV를 골라 주세요');
-    let added=0, people=[], target=null;
-    if(E.length===1&&(!store.records.length||!Object.values(db.profiles).some(q=>q.name===E[0][0]))){
-      // 지금 칸이 비어 있거나(초기화된 폰) 파일 속 이름의 칸이 따로 없으면, 지금 칸으로 이어 붙인다
-      added=mergeImported(store,E[0][1]); restoreFront(store); people.push(`${E[0][0]} → ${store.name}`); target=db.cur;
-    } else for(const [name,P] of E){
-      let id=Object.keys(db.profiles).find(k=>db.profiles[k].name===name);
-      if(!id){ id='p'+Date.now()+Math.floor(Math.random()*1000); db.profiles[id]=normProfile({created:P.records[0]?.t, consent:true},name,P.mode); }
-      added+=mergeImported(db.profiles[id],P); restoreFront(db.profiles[id]); people.push(name); if(!target) target=id;
-    }
-    save(); if(target&&target!==db.cur) switchTo(target); else renderAll();
-    const msg=`불러오기 완료: ${people.join(', ')} · 새로 추가 ${added}개 (이미 있던 건 건너뜀) · 기록 ${store.records.length}개, 오늘은 ${dayNum()}일차예요.`;
-    $('importMsg').textContent=msg; setMsg(msg); store.sheetSentN=null;
-  }catch(err){ const m='불러오지 못했어요: '+(err&&err.message||err); $('importMsg').textContent=m; setMsg(m); }
+  const files=[...e.target.files]; e.target.value=''; if(!files.length) return;
+  // 파일 이름의 날짜(얼굴수평계_이름_2026-11-02.csv) → 없으면 파일 수정 시간 순서로
+  const fdate=f=>{ const m=f.name.match(/(\d{4}-\d{2}-\d{2})/); return m?m[1]:new Date(f.lastModified).toISOString().slice(0,10); };
+  files.sort((a,b)=>fdate(a)<fdate(b)?-1:fdate(a)>fdate(b)?1:a.lastModified-b.lastModified);
+  let added=0, okN=0, emptyN=0, badN=0, target=null; const people=new Set(), dates=new Set();
+  setMsg(`파일 ${files.length}개 읽는 중…`);
+  for(const f of files){
+    try{
+      const text=await f.text();
+      if(!/시간/.test(text.slice(0,3000))||!/종류/.test(text.slice(0,3000))){ badN++; continue; }
+      const E=Object.entries(importFromCsv(text)).filter(([,P])=>P.records.length||P.truth.length);
+      if(!E.length){ emptyN++; continue; }
+      okN++;
+      for(const [name,P] of E){
+        let id=Object.keys(db.profiles).find(k=>db.profiles[k].name===name);
+        if(!id&&(E.length===1)) id=db.cur;   // 파일 속 이름의 칸이 따로 없으면 지금 보고 있는 칸으로 이어 붙인다
+        if(!id){ id='p'+Date.now()+Math.floor(Math.random()*1000); db.profiles[id]=normProfile({created:P.records[0]?.t, consent:true},name,P.mode); }
+        added+=mergeImported(db.profiles[id],P); restoreFront(db.profiles[id]);
+        people.add(db.profiles[id].name); for(const r of P.records) dates.add(dayKey(r.t)); if(!target) target=id;
+      }
+    }catch(err){ badN++; }
+  }
+  save(); if(target&&target!==db.cur) switchTo(target); else renderAll(); store.sheetSentN=null;
+  const D=[...dates].sort(), md=d=>d.slice(5).replace('-','/');
+  const msg=okN?`불러오기 완료: 파일 ${files.length}개 중 기록 있는 파일 ${okN}개${emptyN?` · 빈 파일 ${emptyN}개`:''}${badN?` · 다른 파일 ${badN}개`:''} · 날짜 ${md(D[0])}~${md(D[D.length-1])} (${D.length}일) · 새로 추가 ${added}개 · ${[...people].join(', ')} 기록 ${store.records.length}개, 오늘은 ${dayNum()}일차예요.`
+    :`불러오지 못했어요: 고른 파일 ${files.length}개에 측정 기록이 없어요${emptyN?`(빈 파일 ${emptyN}개)`:''}${badN?`(얼굴 수평계 파일이 아닌 것 ${badN}개)`:''}. 다운로드 폴더의 "얼굴수평계_…csv" 파일들을 골라 주세요.`;
+  $('importMsg').textContent=msg; setMsg(msg);
 };
 try{ if('serviceWorker' in navigator && location.protocol==='https:') navigator.serviceWorker.register('sw.js'); }catch(e){}
 // 저장 상태 표시: 기록이 몇 개 있는지, 브라우저가 지우지 않게 '영구 보관' 허락을 받았는지
