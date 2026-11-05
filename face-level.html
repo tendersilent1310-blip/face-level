@@ -976,13 +976,20 @@ function fixRestoredFw(d){
 }
 const NOSAVE={mF:1,sdF:1};
 function dbJSON(){ return JSON.stringify(db,(k,v)=>NOSAVE[k]?undefined:v); }
-function save(){ const j=dbJSON(); try{ localStorage.setItem(DBKEY, j); }catch(e){ setMsg('저장 공간이 부족해요. CSV로 저장한 뒤 오래된 기록이나 사람을 지워 주세요.'); } idbPut(j); }
+// 예비 저장소(IndexedDB)는 앱이 켜질 때 복원 확인이 끝난 뒤에만 쓴다. 빈 기록으로 예비 저장소를 덮어쓰지 않는다(지우기 버튼은 예외)
+let restoreDone=false, idbPending=false, wipeOK=false;
+function save(){ const j=dbJSON(); try{ localStorage.setItem(DBKEY, j); }catch(e){ setMsg('저장 공간이 부족해요. CSV로 저장한 뒤 오래된 기록이나 사람을 지워 주세요.'); }
+  if(restoreDone) idbPut(j); else idbPending=true; }
 // 자동 저장 2중화: 브라우저 저장소(localStorage) + IndexedDB. 한쪽이 비면 다른 쪽에서 자동 복원
 function idbOpen(){ return new Promise((ok,no)=>{ try{ const q=indexedDB.open('face-level',1); q.onupgradeneeded=()=>q.result.createObjectStore('kv'); q.onsuccess=()=>ok(q.result); q.onerror=()=>no(q.error); }catch(e){ no(e); } }); }
-async function idbPut(j){ try{ const d=await idbOpen(); d.transaction('kv','readwrite').objectStore('kv').put(j,'db'); }catch(e){} }
+async function idbPut(j){ try{
+  const allow=wipeOK; wipeOK=false;
+  if(!allow){ const old=await idbGet(); if(old){ let o=null; try{ o=JSON.parse(old); }catch(e){} let n=null; try{ n=JSON.parse(j); }catch(e){} if(o&&n&&countRecs(o)>0&&countRecs(n)===0) return; } }
+  const d=await idbOpen(); d.transaction('kv','readwrite').objectStore('kv').put(j,'db'); }catch(e){} }
 async function idbGet(){ try{ const d=await idbOpen(); return await new Promise(ok=>{ const q=d.transaction('kv').objectStore('kv').get('db'); q.onsuccess=()=>ok(q.result||null); q.onerror=()=>ok(null); }); }catch(e){ return null; } }
 const countRecs=d=>Object.values(d.profiles||{}).reduce((a,p)=>a+((p&&p.records)||[]).length,0);
-async function autoRestore(){
+async function autoRestore(){ try{ await autoRestore0(); } finally{ restoreDone=true; if(idbPending){ idbPending=false; idbPut(dbJSON()); } } }
+async function autoRestore0(){
   const j=await idbGet(); if(!j) return; let d=null; try{ d=JSON.parse(j); }catch(e){ return; }
   if(!d||!d.profiles||countRecs(d)<=countRecs(db)) return;
   for(const id in d.profiles) d.profiles[id]=normProfile(d.profiles[id]);
@@ -2033,7 +2040,7 @@ function renderAll(){ try{ storageStatus(); }catch(e){} try{ attachPose(); }catc
 $('btnResetRef').onclick=()=>{ if(store.front){ store.frontHistory=store.frontHistory||[]; store.frontHistory.push({...store.front, checks:store.frontChecks, ended:new Date().toISOString()}); } store.ref=null; store.front=null; store.frontChecks=[]; save(); renderAll(); };
 $('btnClear').onclick=()=>{ $('clearConfirm').hidden=false; };
 $('btnClearNo').onclick=()=>{ $('clearConfirm').hidden=true; };
-$('btnClearYes').onclick=()=>{ db.profiles[db.cur]=normProfile({name:store.name,mode:store.mode,faceCm:store.faceCm,created:store.created}); store=db.profiles[db.cur]; lastNormalFrame=null; save(); $('clearConfirm').hidden=true; renderAll(); };
+$('btnClearYes').onclick=()=>{ db.profiles[db.cur]=normProfile({name:store.name,mode:store.mode,faceCm:store.faceCm,created:store.created}); store=db.profiles[db.cur]; lastNormalFrame=null; wipeOK=true; save(); $('clearConfirm').hidden=true; renderAll(); };
 
 // ---------- 사람 ----------
 function renderPeople(){
@@ -2061,7 +2068,7 @@ $('btnAddOk').onclick=()=>{
 };
 $('btnDelPerson').onclick=()=>{ $('delText').textContent=`"${store.name}"의 모든 기록을 지우고 목록에서 뺄까요? 되돌릴 수 없어요.`; $('delConfirm').hidden=false; };
 $('btnDelNo').onclick=()=>{ $('delConfirm').hidden=true; };
-$('btnDelYes').onclick=()=>{ delete db.profiles[db.cur]; $('delConfirm').hidden=true; switchTo(Object.keys(db.profiles)[0]); };
+$('btnDelYes').onclick=()=>{ wipeOK=true; delete db.profiles[db.cur]; $('delConfirm').hidden=true; switchTo(Object.keys(db.profiles)[0]); };
 
 function renderPeopleSummary(box){
   const ids=Object.keys(db.profiles); if(ids.length<2) return;
@@ -2181,7 +2188,7 @@ function adoptCsv(name,csv){
   store.name=name; restoreFront(store); return added;
 }
 const REG_ERR={exists:'이미 있는 이름이에요. 내 이름이 맞으면 "이어서 하기"를 누르세요. 아니면 다른 이름을 정해 주세요.',nouser:'그 이름은 아직 없어요. 처음이면 "처음이에요"를 누르세요.',wrong:'비밀번호가 달라요. 다시 확인해 주세요.',locked:'비밀번호를 여러 번 틀려서 10분 동안 잠겼어요. 잠시 뒤 다시 해 주세요.',bad:'이름이나 비밀번호 모양이 이상해요.',nosheet:'시트가 연결되지 않았어요.'};
-async function doAccount(act){
+async function doAccount(act, auto){
   if(!regValid()) return; const name=$('regName').value.trim().slice(0,20), pin=$('regPin').value;
   if(!$('regShare').checked){ $('regMsg').textContent='로그인으로 기록을 되찾으려면 시트 저장 동의가 필요해요. 원하지 않으면 아래 "로그인 없이"를 눌러 주세요.'; return; }
   $('regNew').disabled=$('regLogin').disabled=true; $('regMsg').textContent=act==='login'?'기록을 찾는 중…':'만드는 중…';
@@ -2199,9 +2206,10 @@ async function doAccount(act){
     const added=adoptCsv(j.name,j.csv);
     store.acc=j.name; store.shareOK=true; store.consent=store.consent||new Date().toISOString(); store.sheetSentN=null;
     db.account={name:j.name,pin:h,t:new Date().toISOString()}; db.registered=true; save();
+    try{ if(window.PasswordCredential&&!auto) navigator.credentials.store(new PasswordCredential({id:j.name,password:pin,name:j.name})); }catch(e){}
     $('regBox').hidden=true; $('regPin').value=''; $('regMsg').textContent=''; renderAll();
     const days=protoDates().length;
-    setMsg(act==='login'?`${j.name}님, 다시 왔군요! 기록 ${store.records.length}개(${days}일)를 되찾았어요. 오늘은 ${dayNum()}일차예요.`
+    setMsg(act==='login'?`${auto?'크롬에 저장된 로그인으로 자동 접속했어요. ':''}${j.name}님, 다시 왔군요! 기록 ${store.records.length}개(${days}일)를 되찾았어요. 오늘은 ${dayNum()}일차예요.`
       :`${j.name}님, 만들었어요!${added?` 시트에 있던 기록 ${added}개도 가져왔어요.`:''} 앞으로 폰 기록이 지워져도 이 이름과 비밀번호로 되찾을 수 있어요.`);
     if(act==='register'&&store.records.length) sendSheet(true);
   }catch(e){ $('regMsg').textContent='인터넷 연결을 확인해 주세요. ('+(e&&e.message||e)+')'; }
@@ -2276,7 +2284,18 @@ async function storageStatus(){
   el.textContent=`이 브라우저에 저장된 기록 ${n}개 (${days}일) · 보관: ${persisted?'영구 ✓':'임시 (브라우저가 지울 수 있음)'} · ${app?'앱으로 열림 ✓':'브라우저 탭으로 열림'}`;
 }
 storageStatus();
-autoRestore();
+autoRestore().then(tryAutoLogin);
+// 기록이 지워져 로그인 화면이 뜨면, 크롬 비밀번호 관리자에 저장된 로그인으로 자동 접속해서 시트에서 기록을 되찾는다
+async function tryAutoLogin(){
+  try{
+    if(!needReg()||!window.PasswordCredential||!navigator.credentials) return;
+    let c=await navigator.credentials.get({password:true,mediation:'silent'});
+    if(!c) c=await navigator.credentials.get({password:true,mediation:'optional'});
+    if(!c||!c.id||!c.password) return;
+    $('regName').value=c.id; $('regPin').value=c.password; regValid(); $('regShare').checked=true;
+    await doAccount('login',true);
+  }catch(e){}
+}
 $('btnCsvAll').onclick=()=>download(csvFor(Object.values(db.profiles)),`얼굴수평계_모든사람_${today()}.csv`);
 
 // ---------- 정답 시험 ----------
