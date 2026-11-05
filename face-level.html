@@ -51,6 +51,10 @@ h2{font-size:15px;margin:0;font-weight:600}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
 .seg button{border:0;border-radius:0;padding:8px 14px;background:transparent}
 .seg button.on{background:var(--accent,#1D5C7A);color:#fff}
+.paperprev{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.paperprev figure{margin:0;display:grid;gap:4px;text-align:center}
+.paperprev img{width:100%;border-radius:8px;border:1px solid var(--line);background:#fff}
+.paperprev figcaption{font-size:12px;color:var(--muted)}
 .viewwrap{position:relative;max-width:420px;width:100%;margin:0 auto}
 .viewwrap canvas{width:100%;height:auto;display:block;border-radius:12px;background:#000}
 .viewtag{position:absolute;left:10px;top:10px;background:rgba(0,0,0,.65);color:#fff;font-size:13px;font-weight:700;padding:4px 10px;border-radius:999px}
@@ -330,6 +334,40 @@ svg text{fill:var(--muted);font-family:var(--font-num);font-size:11px}
       <div class="viewwrap"><canvas id="viewCv"></canvas><div class="viewtag" id="viewTag"></div><div class="viewside l" id="viewSideL"></div><div class="viewside r" id="viewSideR"></div></div>
       <div class="note" id="viewHelp"></div>
       <ul class="viewlegend" id="viewLegend"></ul>
+    </div>
+  </section>
+
+  <section class="panel" id="paperPanel" aria-label="정답 시험실">
+    <h2>정답 시험실 (종이 + 각도기)</h2>
+    <div class="note">정답을 우리가 정해 놓고 앱이 맞히는지 보는 곳이에요. 내 얼굴 기록과는 따로 저장돼요. 사진은 이 폰 안에서만 쓰고 보내지 않아요(결과 숫자만 시트로 가요).</div>
+    <div class="memo">
+      <b>1단계 · 정답 종이 만들기</b>
+      <div class="note">최대한 정면인 내 사진 1장을 고르면, 앱이 <b>완전 대칭(0mm)</b>과 <b>턱만 1·3·5mm 옮긴</b> 얼굴 4장을 만들어요. 데칼코마니라서 사진이 조금 삐뚤어도 정답은 그대로예요.</div>
+      <div class="row">
+        <button class="primary" id="btnPaperPick">정면 사진 고르기</button>
+        <input type="file" id="paperFile" accept="image/*" hidden>
+        <button id="btnPaperLast" disabled>방금 측정한 얼굴로</button>
+      </div>
+      <div class="paperprev" id="paperPrev"></div>
+      <div class="row"><button id="btnPaperPdf" disabled>PDF로 저장 (4장, 인쇄용)</button><button id="btnPaperPng" disabled>그림 4장으로 저장</button></div>
+      <div class="note" id="paperMakeMsg"></div>
+    </div>
+    <div class="memo">
+      <b>2단계 · 종이 재기</b>
+      <div class="note">종이 한 장을 벽에 붙이고, 그 앞 책상에 각도기를 깔아요. 폰을 각도기 가운데에 세워 <b>뒷면 카메라</b>로 종이를 봐요(50~60cm). 아래에서 붙인 종이와 지금 폰 각도를 고르고 "재기"를 누르면 2~3초 동안 재요.</div>
+      <div class="row">
+        <label class="sub" for="paperSheet">붙인 종이</label>
+        <select id="paperSheet"><option value="0">① 0mm (대칭)</option><option value="1">② 1mm</option><option value="3">③ 3mm</option><option value="5">④ 5mm</option></select>
+        <label class="sub" for="paperAngle">폰 각도(각도기)</label>
+        <select id="paperAngle"><option value="-10">왼쪽 10°</option><option value="-5">왼쪽 5°</option><option value="0" selected>0° (정면)</option><option value="5">오른쪽 5°</option><option value="10">오른쪽 10°</option></select>
+        <button class="primary" id="btnPaperMeasure">재기</button>
+      </div>
+      <div class="note" id="paperMeasureMsg"></div>
+    </div>
+    <div class="memo">
+      <b>3단계 · 결과</b>
+      <div id="paperResult"></div>
+      <div class="row"><button id="btnPaperCsv">결과 CSV</button><button class="danger" id="btnPaperClear">결과 지우기</button></div>
     </div>
   </section>
 
@@ -1090,8 +1128,7 @@ $('btnMemo').onclick=()=>{
 // ---------- 카메라·모델 ----------
 async function initModel(){
   $('engineState').textContent='얼굴 인식 모델 불러오는 중…';
-  const {FaceLandmarker, FilesetResolver}=await import(`${LIB}/vision_bundle.mjs`);
-  FL=FaceLandmarker; files=await FilesetResolver.forVisionTasks(`${LIB}/wasm`);
+  if(!FL){ const {FaceLandmarker, FilesetResolver}=await import(`${LIB}/vision_bundle.mjs`); FL=FaceLandmarker; files=await FilesetResolver.forVisionTasks(`${LIB}/wasm`); }
   const opts=d=>({baseOptions:{modelAssetPath:MODEL,delegate:d},runningMode:'VIDEO',numFaces:1,
     outputFaceBlendshapes:true,outputFacialTransformationMatrixes:true});
   try{ landmarker=await FL.createFromOptions(files,opts('GPU')); }
@@ -1598,7 +1635,7 @@ function finishFront(){
 // ---------- 비대칭 눈으로 보기 (사진은 화면에서만 쓰고 저장 안 함) ----------
 let view=null, viewTimer=null;
 const VCOL={eye:'#ffd23f', mouth:'#ff6b9a', chin:'#4dd2ff', nose:'#9dff6b'};
-async function ensureImgLm(){ if(!imgLandmarker) imgLandmarker=await FL.createFromOptions(files,{baseOptions:{modelAssetPath:MODEL,delegate:'CPU'},runningMode:'IMAGE',numFaces:1,outputFacialTransformationMatrixes:true}); }
+async function ensureImgLm(){ if(!FL){ const {FaceLandmarker, FilesetResolver}=await import(`${LIB}/vision_bundle.mjs`); FL=FaceLandmarker; files=await FilesetResolver.forVisionTasks(`${LIB}/wasm`); } if(!imgLandmarker) imgLandmarker=await FL.createFromOptions(files,{baseOptions:{modelAssetPath:MODEL,delegate:'CPU'},runningMode:'IMAGE',numFaces:1,outputFacialTransformationMatrixes:true}); }
 function lastMM(k){ const r=[...store.records].reverse().find(x=>x.mE&&x.mmpp&&x.mE.fwPx); if(!r||r.mE[k]==null) return null; return r.mE[k]/100*r.mE.fwPx*r.mmpp; }
 async function buildView(){
   if(!lastNormalFrame) return;
@@ -1694,6 +1731,116 @@ function setViewMode(m){
 $('viewModes').onclick=e=>{ const b=e.target.closest('button'); if(b) setViewMode(b.dataset.m); };
 $('viewMirror').onchange=drawView; $('viewEx').onchange=drawView;
 $('btnView').onclick=buildView;
+// ---------- 정답 시험실: 데칼코마니 종이 + 각도기 ----------
+const PAPER_MM=[0,1,3,5]; let paperSet=null;
+function paperDB(){ db.paper=db.paper||{sets:[],tests:[]}; return db.paper; }
+function chinMM(r,M){ return r[M].chin/100*r[M].fwPx*r.mmpp; }
+function mmOf(r,M,k){ return r[M][k]/100*r[M].fwPx*r.mmpp; }
+async function imgToCanvas(file){
+  const url=URL.createObjectURL(file); try{
+    const im=await new Promise((ok,no)=>{ const i=new Image(); i.onload=()=>ok(i); i.onerror=()=>no(new Error('사진을 열지 못했어요')); i.src=url; });
+    const sc=Math.min(1,1600/Math.max(im.naturalWidth,im.naturalHeight)), c=document.createElement('canvas');
+    c.width=Math.round(im.naturalWidth*sc); c.height=Math.round(im.naturalHeight*sc); c.getContext('2d').drawImage(im,0,0,c.width,c.height); return c;
+  } finally{ URL.revokeObjectURL(url); }
+}
+async function makePaperSet(src){
+  $('paperMakeMsg').textContent='정답 종이 만드는 중…'; $('btnPaperPdf').disabled=$('btnPaperPng').disabled=true;
+  try{
+    await ensureImgLm();
+    const a=analyzeImage(src); if(!a){ $('paperMakeMsg').textContent='사진에서 얼굴을 못 찾았어요. 얼굴이 크게 나온 정면 사진을 골라 주세요.'; return; }
+    // 1) 얼굴 축을 세우고 2) 중심선 왼쪽 반을 뒤집어 오른쪽에 붙인다(데칼코마니) → 무조건 대칭
+    const f=mirrorFit(a.P), Q=transform(a.P,f.angle,f.center), x0=midlineX(Q);
+    const R=document.createElement('canvas'); R.width=src.width; R.height=src.height;
+    { const g=R.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,R.width,R.height); g.translate(f.center.x,f.center.y); g.rotate(-f.angle); g.translate(-f.center.x,-f.center.y); g.drawImage(src,0,0); }
+    const C=document.createElement('canvas'); C.width=R.width; C.height=R.height;
+    { const g=C.getContext('2d'); g.drawImage(R,0,0); g.save(); g.beginPath(); g.rect(x0,0,C.width-x0,C.height); g.clip(); g.translate(2*x0,0); g.scale(-1,1); g.drawImage(R,0,0); g.restore(); }
+    const base=analyzeImage(C); if(!base||!base.mmpp){ $('paperMakeMsg').textContent='대칭 얼굴에서 눈동자를 못 찾았어요. 조금 더 가까이서 찍은 사진으로 해 주세요.'; return; }
+    const xs=Q.map(p=>p.x), ys=Q.map(p=>p.y), half=Math.max(x0-Math.min(...xs),Math.max(...xs)-x0)*1.15, yA=Math.min(...ys), yB=Math.max(...ys), pad=(yB-yA)*0.12;
+    const box={x:x0-half,y:yA-pad,w:half*2,h:(yB-yA)+pad*2}, id=Math.random().toString(36).slice(2,6).toUpperCase();
+    const sheets=[], digital=[];
+    for(const [i,mm] of PAPER_MM.entries()){
+      const img=mm?warpChin(C, base.P[IDX.chin], base.A.fwPx*0.35, mm/base.mmpp):C;
+      const r=analyzeImage(img); digital.push({mm, E:r&&r.mmpp?chinMM(r,'E')-chinMM(base,'E')+(mm?0:0):null, E0:r&&r.mmpp?chinMM(r,'E'):null});
+      const pg=document.createElement('canvas'); pg.width=1240; pg.height=1754; const g=pg.getContext('2d');
+      g.fillStyle='#fff'; g.fillRect(0,0,pg.width,pg.height);
+      const w=pg.width*0.86, h=w*box.h/box.w, top=Math.max(60,(pg.height-h)/2-60);
+      g.drawImage(img,box.x,box.y,box.w,box.h,(pg.width-w)/2,top,w,h);
+      g.fillStyle='#666'; g.font='28px sans-serif'; g.textAlign='center';
+      g.fillText(`얼굴 수평계 · 정답 종이 ${'①②③④'[i]} · 턱 ${mm}mm${mm?' (사진 오른쪽으로)':' (완전 대칭)'} · 세트 ${id}`, pg.width/2, pg.height-70);
+      sheets.push({mm, page:pg, thumb:pg.toDataURL('image/jpeg',0.6)});
+    }
+    paperSet={id, sheets, mmpp:base.mmpp};
+    const P0=paperDB(); P0.sets.push({id,t:new Date().toISOString(),digital:digital.map(d=>({mm:d.mm,E:d.E0}))}); P0.cur=id; save();
+    $('paperPrev').innerHTML=sheets.map((x,i)=>`<figure><img alt="정답 종이 ${i+1}" src="${x.thumb}"><figcaption>${'①②③④'[i]} ${x.mm}mm</figcaption></figure>`).join('');
+    const d0=digital[0].E0, dg=digital.slice(1).filter(d=>d.E0!=null&&d0!=null).map(d=>(d.E0-d0)/d.mm);
+    $('paperMakeMsg').innerHTML=`세트 <b>${id}</b>를 만들었어요. <b>화면 속 시험</b>(인쇄 전): 대칭 얼굴을 앱이 ${d0!=null?Math.abs(d0).toFixed(2)+'mm':'—'}로 읽었고(정답 0), 턱을 옮긴 만큼의 약 <b>${dg.length?Math.round(mean(dg)*100):'—'}%</b>를 알아챘어요. 이제 PDF를 인쇄해서 2단계로 가요.`;
+    $('btnPaperPdf').disabled=$('btnPaperPng').disabled=false; renderPaper();
+  }catch(e){ $('paperMakeMsg').textContent='만들다 문제가 생겼어요: '+(e&&e.message||e); }
+}
+function loadScript(src){ return new Promise((ok,no)=>{ const s=document.createElement('script'); s.src=src; s.onload=ok; s.onerror=()=>no(new Error('PDF 도구를 못 불러왔어요(인터넷 확인)')); document.head.appendChild(s); }); }
+$('btnPaperPick').onclick=()=>$('paperFile').click();
+$('paperFile').onchange=async e=>{ const f=e.target.files[0]; e.target.value=''; if(!f) return; try{ await makePaperSet(await imgToCanvas(f)); }catch(err){ $('paperMakeMsg').textContent=String(err.message||err); } };
+$('btnPaperLast').onclick=()=>{ if(lastNormalFrame) makePaperSet(lastNormalFrame); };
+$('btnPaperPdf').onclick=async()=>{ if(!paperSet) return;
+  try{ if(!window.jspdf) await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+    const doc=new window.jspdf.jsPDF({unit:'mm',format:'a4'});
+    paperSet.sheets.forEach((x,i)=>{ if(i) doc.addPage(); doc.addImage(x.page.toDataURL('image/jpeg',0.92),'JPEG',0,0,210,297); });
+    doc.save(`정답종이_${paperSet.id}.pdf`); $('paperMakeMsg').textContent+=' PDF를 다운로드 폴더에 저장했어요.';
+  }catch(e){ $('paperMakeMsg').textContent='PDF 저장 실패: '+(e.message||e)+' → "그림 4장으로 저장"을 써 주세요.'; } };
+$('btnPaperPng').onclick=()=>{ if(!paperSet) return; paperSet.sheets.forEach((x,i)=>setTimeout(()=>{ const a=document.createElement('a'); a.href=x.page.toDataURL('image/png'); a.download=`정답종이_${paperSet.id}_${i+1}_${x.mm}mm.png`; a.click(); },i*400)); };
+// 종이 재기: 카메라 화면을 12번 찍어 분석, 가운데 값
+$('btnPaperMeasure').onclick=async()=>{
+  const mm=+$('paperSheet').value, ang=+$('paperAngle').value, msg=$('paperMeasureMsg');
+  $('btnPaperMeasure').disabled=true;
+  try{
+    const ok=await ensureRunning(); if(!ok){ msg.textContent='카메라를 켜지 못했어요.'; return; }
+    await ensureImgLm(); const fr=[];
+    for(let i=0;i<14&&fr.length<10;i++){ msg.textContent=`재는 중… ${fr.length}/10 (폰을 건드리지 마세요)`; await new Promise(r=>setTimeout(r,150)); const r=analyzeImage(snap(video.videoWidth)); if(r&&r.mmpp) fr.push(r); }
+    if(fr.length<6){ msg.textContent='종이 얼굴을 잘 못 찾았어요. 종이를 화면 가운데에 크게, 빛 반사 없이 보이게 해 주세요.'; return; }
+    const med=f=>median(fr.map(f)), sdv=f=>sd(fr.map(f));
+    const T={t:new Date().toISOString(), set:paperDB().cur||'', sheet:mm, angle:ang, cam:$('camSel').value, n:fr.length,
+      E:{chin:med(r=>mmOf(r,'E','chin')), nose:med(r=>mmOf(r,'E','nose')), eye:med(r=>mmOf(r,'E','eye')), mouth:med(r=>mmOf(r,'E','mouth'))}, chinSd:sdv(r=>mmOf(r,'E','chin')),
+      C:{chin:med(r=>mmOf(r,'C','chin'))}, A:{chin:med(r=>mmOf(r,'A','chin'))}, D:{chin:med(r=>mmOf(r,'D','chin'))},
+      yaw:fr[0].pose?med(r=>r.pose.yaw):null, pitch:fr[0].pose?med(r=>r.pose.pitch):null, roll:fr[0].pose?med(r=>r.pose.roll):null, mmpp:med(r=>r.mmpp)};
+    paperDB().tests.push(T); save(); renderPaper();
+    msg.textContent=`${'①②③④'[PAPER_MM.indexOf(mm)]} ${mm}mm 종이 · 폰 ${ang}° → 앱이 읽은 턱 ${T.E.chin>=0?'+':''}${T.E.chin.toFixed(2)}mm (흔들림 ±${T.chinSd.toFixed(2)}). 다음 종이나 각도로 바꿔서 또 재요.`;
+    if(store.shareOK&&sheetUrl()) fetch(sheetUrl(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({v:1,tab:`${store.name}_종이시험_${devId()}`,n:paperDB().tests.length,csv:paperCsv()})}).catch(()=>{});
+  }catch(e){ msg.textContent='재다가 문제가 생겼어요: '+(e&&e.message||e); }
+  finally{ $('btnPaperMeasure').disabled=false; }
+};
+function lsq(pts){ const n=pts.length; if(n<2) return null; const mx=mean(pts.map(p=>p[0])), my=mean(pts.map(p=>p[1])), sxx=pts.reduce((s,p)=>s+(p[0]-mx)**2,0); if(!sxx) return null; const b=pts.reduce((s,p)=>s+(p[0]-mx)*(p[1]-my),0)/sxx; return {slope:b, icpt:my-b*mx}; }
+function renderPaper(){
+  const box=$('paperResult'); if(!box) return; const P0=paperDB(), cur=P0.cur, T=P0.tests.filter(t=>!cur||t.set===cur);
+  if(!T.length){ box.innerHTML='<div class="note">아직 잰 종이가 없어요.</div>'; return; }
+  const g=(sheet,ang)=>T.filter(t=>t.sheet===sheet&&t.angle===ang), m=a=>a.length?median(a):null, f2=v=>v==null?'—':(v>=0?'+':'')+v.toFixed(2);
+  // 표 1: 각도 0°에서 정답 vs 앱
+  const z=PAPER_MM.map(mm=>{ const a=g(mm,0); return {mm, n:a.length, E:m(a.map(t=>t.E.chin))}; });
+  const fit=lsq(z.filter(r=>r.E!=null).map(r=>[r.mm,r.E]));
+  let h=`<div class="tablewrap"><table><thead><tr><th>폰 0°</th><th>정답(턱)</th><th>앱이 읽은 값</th><th>정답과 차이</th><th>잰 횟수</th></tr></thead><tbody>`;
+  for(const r of z) h+=`<tr><td>${'①②③④'[PAPER_MM.indexOf(r.mm)]} 종이</td><td>${r.mm?'+'+r.mm:'0'}mm</td><td>${r.E==null?'—':f2(r.E)+'mm'}</td><td>${r.E==null?'—':f2(r.E-r.mm)+'mm'}</td><td>${r.n}</td></tr>`;
+  h+=`</tbody></table></div>`;
+  if(fit) h+=`<div class="note"><b>감도</b>: 턱을 1mm 옮기면 앱은 <b>${fit.slope.toFixed(2)}mm</b>로 읽어요(<b>${Math.round(fit.slope*100)}%</b>, 100%가 이상적). <b>치우침</b>: 대칭 종이를 ${f2(fit.icpt)}mm로 읽는 셈이에요(0이 이상적).${fit.slope>0.15?` 이 감도로 보정하면 앱 값 ÷ ${fit.slope.toFixed(2)} = 실제 mm 추정이에요.`:''}</div>`;
+  else h+=`<div class="note">감도를 계산하려면 폰 0°에서 종이를 2장 이상 재 주세요(① 0mm와 ④ 5mm를 먼저 추천).</div>`;
+  // 표 2: 각도 영향 (종이별로 0° 대비)
+  const angs=[-10,-5,0,5,10], rows=[];
+  for(const mm of PAPER_MM){ const b=g(mm,0); if(!b.length) continue; const by=m(b.map(t=>t.yaw)), bc=m(b.map(t=>t.E.chin)), bn=m(b.map(t=>t.E.nose));
+    for(const an of angs){ if(!an) continue; const a=g(mm,an); if(!a.length) continue;
+      rows.push({mm, an, yaw:by!=null&&a[0].yaw!=null?m(a.map(t=>t.yaw))-by:null, chin:m(a.map(t=>t.E.chin))-bc, nose:m(a.map(t=>t.E.nose))-bn}); } }
+  if(rows.length){
+    h+=`<div class="tablewrap"><table><thead><tr><th>종이 · 폰 각도</th><th>앱이 잰 돌림(0° 대비)</th><th>턱이 가짜로 변한 양</th><th>코가 가짜로 변한 양</th></tr></thead><tbody>`;
+    for(const r of rows) h+=`<tr><td>${'①②③④'[PAPER_MM.indexOf(r.mm)]} · ${r.an>0?'오른쪽':'왼쪽'} ${Math.abs(r.an)}°</td><td>${r.yaw==null?'—':(r.yaw>=0?'+':'')+r.yaw.toFixed(1)+'°'}</td><td>${f2(r.chin)}mm</td><td>${f2(r.nose)}mm</td></tr>`;
+    h+=`</tbody></table></div><div class="note">각도기로 돌린 만큼 "앱이 잰 돌림"이 나오면 각도 측정이 맞는 거예요. 턱·코 칸은 <b>폰이 그만큼 틀어지면 가짜 비대칭이 몇 mm 생기는지</b>예요. 종이는 납작해서 진짜 얼굴보다 작게 나올 수 있어요.</div>`;
+  } else h+=`<div class="note">각도 영향을 보려면 같은 종이를 폰 0°와 5°·10°로 재 주세요.</div>`;
+  box.innerHTML=h;
+}
+function paperCsv(){
+  const head=['세트','시간','종이_정답mm','폰각도','카메라','잰장수','E_턱mm','E_턱흔들림','E_코mm','E_눈mm','E_입꼬리mm','C_턱mm','A_턱mm','D_턱mm','yaw','pitch','roll','mm_per_px'];
+  const rows=[head.join(',')]; const n=v=>v==null?'':(+v).toFixed(4);
+  for(const t of paperDB().tests) rows.push([t.set,t.t,t.sheet,t.angle,t.cam,t.n,n(t.E.chin),n(t.chinSd),n(t.E.nose),n(t.E.eye),n(t.E.mouth),n(t.C.chin),n(t.A.chin),n(t.D.chin),n(t.yaw),n(t.pitch),n(t.roll),n(t.mmpp)].join(','));
+  return rows.join('\n');
+}
+$('btnPaperCsv').onclick=()=>download('﻿'+paperCsv(),`정답종이시험_${today()}.csv`);
+$('btnPaperClear').onclick=()=>{ const P0=paperDB(); P0.tests=P0.tests.filter(t=>t.set!==P0.cur); save(); renderPaper(); };
 function snap(w){
   const c=document.createElement('canvas'); c.width=w; c.height=Math.round(w*video.videoHeight/video.videoWidth);
   c.getContext('2d').drawImage(video,0,0,c.width,c.height); return c;
@@ -1704,7 +1851,7 @@ function finish(s){
   const hasE=burst.every(f=>f.E), sE=hasE?summarize(burst.map(f=>f.E)):null;
   const pick=a=>{ const o={}; for(const k of ['eye','mouth','chin','nose','width','fwPx']) o[k]=median(a.map(m=>m[k])); return o; };
   const mm=burst.map(f=>f.mmpp).filter(v=>v), mmpp=mm.length?median(mm):null;
-  if(it.kind==='normal'||it.kind==='repeat'||it.kind==='extra'){ lastNormalFrame=snap(video.videoWidth); $('btnTruth').disabled=false; $('btnView').disabled=false; }
+  if(it.kind==='normal'||it.kind==='repeat'||it.kind==='extra'){ lastNormalFrame=snap(video.videoWidth); $('btnTruth').disabled=false; $('btnView').disabled=false; $('btnPaperLast').disabled=false; }
   let img=''; if(it.kind!=='repeat'&&it.kind!=='clahe'){ try{ img=snap(96).toDataURL('image/jpeg',0.55); }catch(e){} }
   const rec={id:Date.now(), v:5, t:new Date().toISOString(), day:dayNum(), kind:it.kind, tag:it.tag||'', prep:!!it.prep, repeatId:it.repeatId||null,
     m:sA.m, sd:sA.sd, mB:sB.m, sdB:sB.sd, mC:sC.m, sdC:sC.sd, mD:sD.m, sdD:sD.sd, mE:sE?sE.m:null, sdE:sE?sE.sd:null,
@@ -1881,7 +2028,7 @@ function renderRef(){
   if(store.front){ const fu=frontUncertainty(store.front, store.frontChecks); tag.className='tag '+(fu.basis!=='measured'||fu.deg<=2?'ok':'warn'); tag.textContent=`${store.name}의 정면 등록됨 · 좌우 ${store.front.yaw.toFixed(1)}° 위아래 ${store.front.pitch.toFixed(1)}° · 오차 ±${fu.deg.toFixed(1)}°`; }
   else { tag.className='tag warn'; tag.textContent='개인 정면 미등록 (측정 시작 때 먼저 해요)'; }
 }
-function renderAll(){ try{ storageStatus(); }catch(e){} try{ attachPose(); }catch(e){} const eh=$('emptyHint'); if(eh) eh.hidden=Object.values(db.profiles).some(p=>p.records.length); renderPeople(); renderToday(); try{ fillFree(); freeHint(); }catch(e){} try{ renderSheet(); }catch(e){} try{ showReg(); }catch(e){} renderLatest(); renderSummary(); renderTrend(); renderHist(); renderRef(); }
+function renderAll(){ try{ storageStatus(); }catch(e){} try{ attachPose(); }catch(e){} const eh=$('emptyHint'); if(eh) eh.hidden=Object.values(db.profiles).some(p=>p.records.length); renderPeople(); renderToday(); try{ fillFree(); freeHint(); }catch(e){} try{ renderSheet(); }catch(e){} try{ showReg(); }catch(e){} try{ renderPaper(); }catch(e){} renderLatest(); renderSummary(); renderTrend(); renderHist(); renderRef(); }
 
 $('btnResetRef').onclick=()=>{ if(store.front){ store.frontHistory=store.frontHistory||[]; store.frontHistory.push({...store.front, checks:store.frontChecks, ended:new Date().toISOString()}); } store.ref=null; store.front=null; store.frontChecks=[]; save(); renderAll(); };
 $('btnClear').onclick=()=>{ $('clearConfirm').hidden=false; };
@@ -2155,7 +2302,7 @@ function analyzeImage(cv, flipped){
   const d=res.facialTransformationMatrixes&&res.facialTransformationMatrixes[0]?res.facialTransformationMatrixes[0].data:null;
   const roll=d?poseFromMatrix(d,db.layout||'col+').rollRad:eyeLineAngle(P);
   const fr=store.front&&flipped?{yaw:-store.front.yaw,pitch:store.front.pitch}:store.front;
-  return {P, A:computeMetrics(P,roll), B:computeMetricsB(P), C:computeMetricsC(P), D:computeMetricsD(L,W,H,roll,fr), E:computeMetricsE(L,W,H), mmpp:mmPerPx(P)};
+  return {P, A:computeMetrics(P,roll), B:computeMetricsB(P), C:computeMetricsC(P), D:computeMetricsD(L,W,H,roll,fr), E:computeMetricsE(L,W,H), mmpp:mmPerPx(P), pose:d?poseFromMatrix(d,db.layout||'col+'):null};
 }
 async function runTruth(){
   const box=$('truthBox'); box.innerHTML=''; const note=document.createElement('div'); note.className='note'; box.appendChild(note);
