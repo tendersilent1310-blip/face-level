@@ -2206,7 +2206,7 @@ async function doAccount(act, auto){
     const added=adoptCsv(j.name,j.csv);
     store.acc=j.name; store.shareOK=true; store.consent=store.consent||new Date().toISOString(); store.sheetSentN=null;
     db.account={name:j.name,pin:h,t:new Date().toISOString()}; db.registered=true; save();
-    try{ if(window.PasswordCredential&&!auto) navigator.credentials.store(new PasswordCredential({id:j.name,password:pin,name:j.name})); }catch(e){}
+    try{ if(window.PasswordCredential&&!auto) navigator.credentials.store(new PasswordCredential({id:j.name,password:pin,name:j.name})).catch(()=>{}); }catch(e){}
     $('regBox').hidden=true; $('regPin').value=''; $('regMsg').textContent=''; renderAll();
     const days=protoDates().length;
     setMsg(act==='login'?`${auto?'크롬에 저장된 로그인으로 자동 접속했어요. ':''}${j.name}님, 다시 왔군요! 기록 ${store.records.length}개(${days}일)를 되찾았어요. 오늘은 ${dayNum()}일차예요.`
