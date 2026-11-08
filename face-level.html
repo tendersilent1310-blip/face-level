@@ -173,7 +173,7 @@ svg text{fill:var(--muted);font-family:var(--font-num);font-size:11px}
 <div class="wrap">
   <header>
     <div>
-      <h1>얼굴 수평계 <span class="sub">실험실 · 버전 <span id="appVer">11.08-c</span></span></h1>
+      <h1>얼굴 수평계 <span class="sub">실험실 · 버전 <span id="appVer">11.08-d</span></span></h1>
       <div class="sub">4주 동안 매일 측정해서, 폰 카메라가 내 얼굴을 얼마나 정확하게 재는지 증명해요.</div>
     </div>
     <div class="row"><button class="primary" id="btnLabOpen">🧪 정답 시험실</button><span class="sub" id="engineState">준비 전</span></div>
@@ -1872,7 +1872,7 @@ function closeLab(){ $('paperPanel').hidden=true; document.body.classList.remove
 $('btnLabOpen').onclick=openLab; $('btnLabClose').onclick=closeLab;
 $('btnLabReset').onclick=()=>{ $('labResetAsk').hidden=false; };
 $('labResetNo').onclick=()=>{ $('labResetAsk').hidden=true; };
-$('labResetYes').onclick=()=>{ const P0=paperDB(); P0.tests=P0.tests.filter(t=>t.set!==P0.cur); paperLast=''; save(); $('labResetAsk').hidden=true; $('paperMeasureMsg').textContent='';
+$('labResetYes').onclick=()=>{ const P0=paperDB(); P0.tests=P0.tests.filter(t=>t.set!==P0.cur); const si=P0.sets.find(x=>x.id===P0.cur); if(si) si.faceReady=false; paperLast=''; save(); $('labResetAsk').hidden=true; $('paperMeasureMsg').textContent='';
   renderPaper(); const g=$('paperStepMsg'); if(g) g.textContent='처음부터 다시 시작해요. 단계 1부터 해 주세요.'; $('paperPanel').scrollTop=0; };
 let paperLast='';
 function sheetName(mm){ return mm==='face'?'내 얼굴':`${'①②③④'[PAPER_MM.indexOf(mm)]} ${mm}mm 종이`; }
@@ -1886,7 +1886,7 @@ const GUIDE=[
   {sheet:3,ang:10,need:1,say:'<b>책을 오른쪽으로 10칸</b> 돌리세요.'},
   {sheet:3,ang:-5,need:1,say:'<b>책을 왼쪽으로 5칸</b> 돌리세요.'},
   {sheet:3,ang:-10,need:1,say:'<b>책을 왼쪽으로 10칸</b> 돌리세요. 종이 시험은 이게 마지막이에요.'},
-  {sheet:'face',ang:0,need:3,say:'이제 <b>내 얼굴</b>이에요. 폰은 그대로 두고 그 앞(50~60cm)에 앉아 <b>코끝이 카메라</b>를 향하게 해요. 3번 재요.'},
+  {sheet:'face',ang:0,need:3,say:'<b>코끝이 앞면 카메라</b>를 똑바로 향하게 앉아요(50~60cm). 3번 재요.'},
   {sheet:'face',ang:5,need:3,say:'<b>코끝을 오른쪽 5cm 스티커</b>로 향하게 고개만 살짝 돌려요. 3번 재요.'},
   {sheet:'face',ang:10,need:3,say:'<b>코끝을 오른쪽 10cm 스티커</b>로. 3번 재요.'},
   {sheet:'face',ang:-5,need:3,say:'<b>코끝을 왼쪽 5cm 스티커</b>로. 3번 재요.'},
@@ -1901,6 +1901,23 @@ function renderGuide(T){
   const bar=`<div class="prog"><i style="width:${Math.round(got/total*100)}%"></i></div><div class="sub">${got}/${total}번 완료</div>`;
   if(i<0){ box.innerHTML=`<div class="big">다 했어요! 🎉</div>${bar}<div class="note">아래 결과 표를 캡처해서 보내 주거나 "결과 CSV"를 보내 주세요. 시트에도 자동으로 올라갔어요.</div>`; return; }
   const st=GUIDE[i], face=st.sheet==='face', k=done(st);
+  // 종이 시험이 끝나고 내 얼굴로 넘어가는 순간: 폰을 반대로 돌리는 안내를 먼저 보여 준다
+  const setInfo=P0.sets.find(x=>x.id===P0.cur)||{};
+  if(face&&!setInfo.faceReady){
+    box.innerHTML=`<div class="big">종이 시험 끝! 🎉 이제 <b>내 얼굴</b> 차례예요</div>
+      <div class="note"><b>1)</b> 폰 거치대를 <b>반대로 돌려서</b> 폰 화면이 <b>나를 보게</b> 해요(또는 책을 치우고 화면 쪽에 앉아도 돼요).<br>
+      <b>2)</b> 폰에서 <b>50~60cm</b> 떨어져 앉아요. 지금부터 폰은 다시 <b>고정</b>이에요.<br>
+      <b>3)</b> 앞면 카메라(화면 위 작은 렌즈) 양옆 <b>5cm·10cm</b>에 스티커를 붙여요.<br>
+      <b>4)</b> 준비되면 아래 버튼 → 앞면 카메라가 켜져요.</div>
+      <button class="primary big" id="btnFaceReady">돌렸어요 · 앞면 카메라 켜기</button>${bar}`;
+    $('btnFaceReady').onclick=async()=>{
+      $('btnFaceReady').disabled=true; setInfo.faceReady=true; save();
+      try{ $('camSel').value='user'; if(running) await startCamera(); else await ensureRunning(); }catch(e){}
+      renderPaper();
+      const g=$('paperStepMsg'); if(g) g.textContent='미리보기에 내 얼굴이 가운데 크게 보이게 앉은 뒤 "이대로 재기"를 눌러요.';
+    };
+    return;
+  }
   box.innerHTML=`<div class="sub">단계 ${i+1}/${GUIDE.length}</div><div class="big">${st.say}</div>
     <div class="note">카메라: <b>${face?'앞면(셀카)':'뒷면'}</b> · 준비되면 아래 버튼을 누르고 2~3초 동안 ${face?'고개를 멈춰 주세요':'폰과 책을 건드리지 마세요'}.${st.need>1?` (${k}/${st.need}번 했어요)`:''}</div>
     <button class="primary big" id="btnPaperStep"></button>${paperLast?`<div class="note"><b>${paperLast}</b></div>`:''}<div class="note" id="paperStepMsg"></div>${bar}`;
