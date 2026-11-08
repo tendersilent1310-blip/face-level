@@ -176,7 +176,7 @@ svg text{fill:var(--muted);font-family:var(--font-num);font-size:11px}
 <div class="wrap">
   <header>
     <div>
-      <h1>얼굴 수평계 <span class="sub">실험실 · 버전 <span id="appVer">11.08-g</span></span></h1>
+      <h1>얼굴 수평계 <span class="sub">실험실 · 버전 <span id="appVer">11.08-h</span></span></h1>
       <div class="sub">4주 동안 매일 측정해서, 폰 카메라가 내 얼굴을 얼마나 정확하게 재는지 증명해요.</div>
     </div>
     <div class="row"><button class="primary" id="btnLabOpen">🧪 정답 시험실</button><span class="sub" id="engineState">준비 전</span></div>
@@ -1924,7 +1924,15 @@ function renderGuide(T){
   const total=GUIDE.reduce((a,st)=>a+st.need,0), got=GUIDE.reduce((a,st)=>a+Math.min(st.need,done(st)),0);
   const i=GUIDE.findIndex(st=>done(st)<st.need);
   const bar=`<div class="prog"><i style="width:${Math.round(got/total*100)}%"></i></div><div class="sub">${got}/${total}번 완료</div>`;
-  if(i<0){ box.innerHTML=`<div class="big">다 했어요! 🎉</div>${bar}<div class="note">아래 결과 표를 캡처해서 보내 주거나 "결과 CSV"를 보내 주세요. 시트에도 자동으로 올라갔어요.</div>`; return; }
+  if(i<0){ box.innerHTML=`<div class="big">다 했어요! 🎉</div>${bar}
+      <button class="primary big" id="btnDoneCsv">📄 결과 CSV 저장하기</button>
+      <button id="btnDoneSheet">시트로 다시 보내기</button>
+      <button id="btnDoneView">결과 표 보기 ↓</button>
+      <div class="note" id="doneMsg">CSV를 저장한 뒤 그 파일을 Claude에게 보내 주세요(다운로드 폴더의 "정답종이시험_날짜.csv").</div>`;
+    $('btnDoneCsv').onclick=()=>{ download('\ufeff'+paperCsv(),`정답종이시험_${today()}.csv`); $('doneMsg').textContent='저장했어요! 다운로드 폴더의 "정답종이시험_'+today()+'.csv"를 보내 주세요.'; };
+    $('btnDoneSheet').onclick=async()=>{ try{ const r=await fetch(sheetUrl(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({v:1,tab:`${store.name}_종이시험_${devId()}`,n:paperDB().tests.length,csv:paperCsv()})}); const j=await r.json(); $('doneMsg').textContent=j.ok?'시트로 보냈어요.':'시트로 못 보냈어요: '+(j.err||''); }catch(e){ $('doneMsg').textContent='시트로 못 보냈어요(인터넷 확인).'; } };
+    $('btnDoneView').onclick=()=>{ $('paperResult').scrollIntoView({behavior:'smooth',block:'start'}); };
+    return; }
   const st=GUIDE[i], face=st.sheet==='face', k=done(st);
   // 종이 시험이 끝나고 내 얼굴로 넘어가는 순간: 폰을 반대로 돌리는 안내를 먼저 보여 준다
   const setInfo=P0.sets.find(x=>x.id===P0.cur)||{};
