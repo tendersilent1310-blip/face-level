@@ -65,6 +65,8 @@ body.labopen{overflow:hidden}
 .paperview video{width:100%;display:block}
 .paperview.mirror video{transform:scaleX(-1)}
 .paperview .pvtag{position:absolute;left:8px;top:8px;background:rgba(0,0,0,.65);color:#fff;font-size:13px;font-weight:700;padding:3px 10px;border-radius:999px}
+.angbox{font-size:20px;font-weight:700;text-align:center;padding:10px;border-radius:10px;background:var(--tube)}
+.angbox.ok{background:var(--ok-soft);color:var(--ok)} .angbox.no{background:var(--warn-soft);color:var(--warn)}
 .guidecard{border:2px solid var(--accent);border-radius:12px;padding:12px;display:grid;gap:8px}
 .guidecard .big{font-size:18px;font-weight:700}
 .guidecard .prog{height:8px;border-radius:4px;background:var(--tube);overflow:hidden}
@@ -174,7 +176,7 @@ svg text{fill:var(--muted);font-family:var(--font-num);font-size:11px}
 <div class="wrap">
   <header>
     <div>
-      <h1>얼굴 수평계 <span class="sub">실험실 · 버전 <span id="appVer">11.08-e</span></span></h1>
+      <h1>얼굴 수평계 <span class="sub">실험실 · 버전 <span id="appVer">11.08-f</span></span></h1>
       <div class="sub">4주 동안 매일 측정해서, 폰 카메라가 내 얼굴을 얼마나 정확하게 재는지 증명해요.</div>
     </div>
     <div class="row"><button class="primary" id="btnLabOpen">🧪 정답 시험실</button><span class="sub" id="engineState">준비 전</span></div>
@@ -374,7 +376,7 @@ svg text{fill:var(--muted);font-family:var(--font-num);font-size:11px}
         3) <b>폰은 거치대에 고정</b>하고 책에서 <b>50~60cm</b>. 폰은 끝까지 움직이지 않아요.<br>
         4) "오른쪽 5°"는 <b>책을</b> 각도기 위에서 5칸 돌리는 거예요. 종이 얼굴은 화면 가운데에 그대로 있어요.<br>
         5) 종이에 <b>불빛 반사</b>가 없게.<br>
-        6) <b>내 얼굴</b> 단계: 폰 카메라 옆 <b>5cm·10cm</b>(양쪽)에 작은 스티커를 붙이고, <b>코끝이 스티커를 향하게</b> 고개만 돌려요(55cm 거리에서 5cm≈5°, 10cm≈10°). 정확한 각도는 앱이 직접 재요.
+        6) <b>내 얼굴</b> 단계: 폰은 그대로, 카메라만 앞면으로 바꾸고 화면 쪽에 앉아요. 고개를 돌린 각도는 <b>앱이 실시간 숫자</b>로 보여 주니, 숫자가 초록색일 때 재면 돼요.
       </details>
       <div class="guidecard" id="paperGuide"></div>
     </div></div>
@@ -1593,9 +1595,10 @@ function drawOverlay(s,allOk,T){
 function setRing(frac){ $('ring').hidden=frac<=0; $('ringArc').setAttribute('stroke-dashoffset',String(138.2*(1-Math.min(1,frac)))); }
 
 const HOLD=500;
+let liveS=null;
 function step(res){
   const it=curItem(), T=it&&it.target;
-  const s=evaluate(res), list=checksFor(s,T);
+  const s=evaluate(res), list=checksFor(s,T); liveS=s;
   applyHyst(list, it?it.kind+'|'+(it.tag||'')+'|'+(it.try||''):'idle');
   // 정면 2·3번째: 실제로 고개를 옆으로 돌렸다가 돌아와야 진행 (안 돌리면 '다시 재기'가 아니라 '같은 걸 3번 복사'가 된다)
   let away=null;
@@ -1870,6 +1873,18 @@ async function openLab(){
   renderPaper();
 }
 function closeLab(){ $('paperPanel').hidden=true; document.body.classList.remove('labopen'); }
+// 내 얼굴 단계: 고개를 돌린 각도를 실시간으로 보여 준다(정면 0° 측정이 기준). 목표 ±1.5° 안이면 초록
+setInterval(()=>{
+  const box=$('angBox'); if(!box||$('paperPanel').hidden) return;
+  const P0=paperDB(), T=P0.tests.filter(t=>t.set===P0.cur), st=GUIDE.find(g=>T.filter(t=>t.sheet===g.sheet&&t.angle===g.ang).length<g.need);
+  if(!st||st.sheet!=='face') return;
+  if(!liveS||!liveS.face||!liveS.pose){ box.className='angbox no'; box.textContent='얼굴을 찾는 중… 화면 가운데로 와 주세요'; return; }
+  const base=T.filter(t=>t.sheet==='face'&&t.angle===0&&t.yaw!=null).map(t=>t.yaw), target=Math.abs(st.ang);
+  const now=base.length?Math.abs(liveS.pose.yaw-median(base)):Math.abs(liveS.pose.yaw);
+  const ok=Math.abs(now-target)<=1.5;
+  box.className='angbox '+(ok?'ok':'no');
+  box.textContent=`지금 ${now.toFixed(1)}° · 목표 ${target}° ${ok?'✅ 이대로 재기!':now<target?'→ 조금 더 돌려요':'← 조금 덜 돌려요'}`;
+},250);
 $('btnLabOpen').onclick=openLab; $('btnLabClose').onclick=closeLab;
 $('btnPvFlip').onclick=async()=>{ $('btnPvFlip').disabled=true; try{ $('camSel').value=$('camSel').value==='user'?'environment':'user'; if(running) await startCamera(); else await ensureRunning(); }catch(e){} finally{ $('btnPvFlip').disabled=false; renderPaper(); } };
 $('btnLabReset').onclick=()=>{ $('labResetAsk').hidden=false; };
@@ -1888,11 +1903,11 @@ const GUIDE=[
   {sheet:3,ang:10,need:1,say:'<b>책을 오른쪽으로 10칸</b> 돌리세요.'},
   {sheet:3,ang:-5,need:1,say:'<b>책을 왼쪽으로 5칸</b> 돌리세요.'},
   {sheet:3,ang:-10,need:1,say:'<b>책을 왼쪽으로 10칸</b> 돌리세요. 종이 시험은 이게 마지막이에요.'},
-  {sheet:'face',ang:0,need:3,say:'<b>코끝이 앞면 카메라</b>를 똑바로 향하게 앉아요(50~60cm). 3번 재요.'},
-  {sheet:'face',ang:5,need:3,say:'<b>코끝을 오른쪽 5cm 스티커</b>로 향하게 고개만 살짝 돌려요. 3번 재요.'},
-  {sheet:'face',ang:10,need:3,say:'<b>코끝을 오른쪽 10cm 스티커</b>로. 3번 재요.'},
-  {sheet:'face',ang:-5,need:3,say:'<b>코끝을 왼쪽 5cm 스티커</b>로. 3번 재요.'},
-  {sheet:'face',ang:-10,need:3,say:'<b>코끝을 왼쪽 10cm 스티커</b>로. 3번 재요. 마지막이에요!'}
+  {sheet:'face',ang:0,need:3,say:'<b>코끝이 앞면 카메라</b>를 똑바로 향하게 앉아요(50~60cm). 아래 숫자가 <b>0° 근처</b>에서 초록색이 되면 재요. 3번.'},
+  {sheet:'face',ang:5,need:3,say:'고개를 <b>오른쪽으로 살짝</b> 돌려요. 아래 숫자가 <b>5° 근처</b>에서 초록색이 되면 재요. 3번.'},
+  {sheet:'face',ang:10,need:3,say:'고개를 <b>오른쪽으로 조금 더</b>. 숫자가 <b>10° 근처</b>에서 초록색이 되면 재요. 3번.'},
+  {sheet:'face',ang:-5,need:3,say:'이번엔 <b>왼쪽으로 살짝</b>. 숫자가 <b>5° 근처</b>에서 초록색이 되면 재요. 3번.'},
+  {sheet:'face',ang:-10,need:3,say:'<b>왼쪽으로 조금 더</b>. 숫자가 <b>10° 근처</b>에서 초록색이 되면 재요. 3번. 마지막이에요!'}
 ];
 function renderGuide(T){
   const box=$('paperGuide'); if(!box) return; const P0=paperDB();
@@ -1909,7 +1924,7 @@ function renderGuide(T){
     box.innerHTML=`<div class="big">종이 시험 끝! 🎉 이제 <b>내 얼굴</b> 차례예요</div>
       <div class="note"><b>폰은 그대로 둬요.</b> 카메라만 앞면(화면 쪽)으로 바꿀게요.<br>
       <b>1)</b> 형은 <b>폰 화면 쪽</b>에 앉아요(폰에서 <b>50~60cm</b>). 앞면 카메라는 화면 쪽을 봐요.<br>
-      <b>2)</b> 앞면 카메라(화면 위 작은 렌즈) 양옆 <b>5cm·10cm</b>에 스티커를 붙여요.<br>
+      <b>2)</b> 스티커는 필요 없어요. 고개를 얼마나 돌렸는지 <b>앱이 숫자로 실시간</b> 보여 줘요.<br>
       <b>3)</b> 아래 버튼을 누르면 앞면 카메라로 바뀌어요.</div>
       <button class="primary big" id="btnFaceReady">앞면 카메라로 바꾸기</button>${bar}`;
     $('btnFaceReady').onclick=async()=>{
@@ -1922,6 +1937,7 @@ function renderGuide(T){
   }
   box.innerHTML=`<div class="sub">단계 ${i+1}/${GUIDE.length}</div><div class="big">${st.say}</div>
     <div class="note">카메라: <b>${face?'앞면(셀카)':'뒷면'}</b> · 준비되면 아래 버튼을 누르고 2~3초 동안 ${face?'고개를 멈춰 주세요':'폰과 책을 건드리지 마세요'}.${st.need>1?` (${k}/${st.need}번 했어요)`:''}</div>
+    ${face?'<div class="angbox" id="angBox">얼굴을 찾는 중…</div>':''}
     <button class="primary big" id="btnPaperStep"></button>${paperLast?`<div class="note"><b>${paperLast}</b></div>`:''}<div class="note" id="paperStepMsg"></div>${bar}`;
   const want=face?'user':'environment', ready=running&&$('camSel').value===want;
   $('btnPaperStep').textContent=!running?'① 카메라 켜기':!ready?`① ${face?'앞면':'뒷면'} 카메라로 바꾸기`:'② 화면 보고 맞춘 뒤 → 이대로 재기';
