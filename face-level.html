@@ -51,6 +51,10 @@ h2{font-size:15px;margin:0;font-weight:600}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
 .seg button{border:0;border-radius:0;padding:8px 14px;background:transparent}
 .seg button.on{background:var(--accent,#1D5C7A);color:#fff}
+.paperview{position:relative;max-width:420px;width:100%;margin:0 auto;border-radius:12px;overflow:hidden;background:#000}
+.paperview video{width:100%;display:block}
+.paperview.mirror video{transform:scaleX(-1)}
+.paperview .pvtag{position:absolute;left:8px;top:8px;background:rgba(0,0,0,.65);color:#fff;font-size:13px;font-weight:700;padding:3px 10px;border-radius:999px}
 .guidecard{border:2px solid var(--accent);border-radius:12px;padding:12px;display:grid;gap:8px}
 .guidecard .big{font-size:18px;font-weight:700}
 .guidecard .prog{height:8px;border-radius:4px;background:var(--tube);overflow:hidden}
@@ -373,6 +377,7 @@ svg text{fill:var(--muted);font-family:var(--font-num);font-size:11px}
         5) 종이에 <b>불빛 반사</b>가 없게.<br>
         6) <b>"내 얼굴"</b> 단계에서는 뒤통수를 <b>벽에 딱 붙이고</b> 앉아요. 폰은 그대로 각도기 위, 앞면 카메라로 나를 봐요.
       </details>
+      <div class="paperview" id="paperView" hidden><video id="paperVid" playsinline muted></video><div class="pvtag" id="paperVidTag"></div></div>
       <div class="guidecard" id="paperGuide"></div>
     </div>
     <div class="memo">
@@ -1171,6 +1176,7 @@ async function startCamera(){
   stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:facing,width:{ideal:1920},height:{ideal:1080}}});
   video.srcObject=stream; await video.play();
   $('stage').classList.toggle('mirror', facing==='user');
+  try{ const pv=$('paperVid'); pv.srcObject=stream; pv.play().catch(()=>{}); $('paperView').classList.toggle('mirror', facing==='user'); $('paperVidTag').textContent=facing==='user'?'앞면 카메라':'뒷면 카메라'; }catch(e){}
   overlay.width=video.videoWidth; overlay.height=video.videoHeight;
   proc.width=Math.min(1280,video.videoWidth); proc.height=Math.round(proc.width*video.videoHeight/video.videoWidth);
   $('stage').style.aspectRatio=`${video.videoWidth}/${video.videoHeight}`;
@@ -1867,12 +1873,22 @@ function renderGuide(T){
   const st=GUIDE[i], face=st.sheet==='face', k=done(st);
   box.innerHTML=`<div class="sub">단계 ${i+1}/${GUIDE.length}</div><div class="big">${st.say}</div>
     <div class="note">카메라: <b>${face?'앞면(셀카)':'뒷면'}</b> · 준비되면 아래 버튼을 누르고 2~3초 동안 폰을 건드리지 마세요.${st.need>1?` (${k}/${st.need}번 했어요)`:''}</div>
-    <button class="primary big" id="btnPaperStep">재기</button>${bar}`;
+    <button class="primary big" id="btnPaperStep"></button>${bar}`;
+  const want=face?'user':'environment', ready=running&&$('camSel').value===want;
+  $('paperView').hidden=!running;
+  $('btnPaperStep').textContent=!running?'① 카메라 켜기':!ready?`① ${face?'앞면':'뒷면'} 카메라로 바꾸기`:'② 화면 보고 맞춘 뒤 → 이대로 재기';
   $('btnPaperStep').onclick=async()=>{
     $('btnPaperStep').disabled=true; $('paperSheet').value=String(st.sheet); $('paperAngle').value=String(st.ang);
-    const want=face?'user':'environment';
-    if($('camSel').value!==want){ $('camSel').value=want; if(running){ await startCamera(); await new Promise(r=>setTimeout(r,800)); } }
-    await paperMeasure();
+    try{
+      if(!ready){
+        $('camSel').value=want;
+        if(running) await startCamera(); else { const ok=await ensureRunning(); if(!ok){ $('paperMeasureMsg').textContent=$('engineState').textContent||'카메라를 켜지 못했어요.'; return; } }
+        $('paperView').hidden=false; $('paperView').scrollIntoView({behavior:'smooth',block:'center'});
+        $('paperMeasureMsg').textContent=face?'미리보기에 내 얼굴이 가운데 크게 보이게 맞춘 뒤 "이대로 재기"를 눌러요.':'미리보기에 종이 얼굴이 가운데 크게 보이게 맞춘 뒤 "이대로 재기"를 눌러요.';
+        renderPaper(); return;
+      }
+      await paperMeasure();
+    } finally { const b=$('btnPaperStep'); if(b) b.disabled=false; }
   };
 }
 function lsq(pts){ const n=pts.length; if(n<2) return null; const mx=mean(pts.map(p=>p[0])), my=mean(pts.map(p=>p[1])), sxx=pts.reduce((s,p)=>s+(p[0]-mx)**2,0); if(!sxx) return null; const b=pts.reduce((s,p)=>s+(p[0]-mx)*(p[1]-my),0)/sxx; return {slope:b, icpt:my-b*mx}; }
