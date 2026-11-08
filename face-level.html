@@ -51,6 +51,15 @@ h2{font-size:15px;margin:0;font-weight:600}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
 .seg button{border:0;border-radius:0;padding:8px 14px;background:transparent}
 .seg button.on{background:var(--accent,#1D5C7A);color:#fff}
+.lab{position:fixed;inset:0;z-index:60;border-radius:0;border:0;overflow-y:auto;max-width:none;margin:0;
+  padding:0 max(12px,env(safe-area-inset-right,0px)) 40px max(12px,env(safe-area-inset-left,0px));align-content:start}
+.lab[hidden]{display:none}
+.labhead{position:sticky;top:0;z-index:3;display:flex;justify-content:space-between;align-items:center;padding:10px 0;background:var(--panel)}
+.labcam{position:sticky;top:52px;z-index:2;background:var(--panel);padding-bottom:8px}
+.labcam .paperview{max-height:42vh;aspect-ratio:4/3}
+.labcam .paperview video{height:100%;object-fit:contain}
+.pvoff{position:absolute;inset:0;display:grid;place-items:center;color:#fff;font-size:14px;text-align:center;padding:16px}
+body.labopen{overflow:hidden}
 .paperview{position:relative;max-width:420px;width:100%;margin:0 auto;border-radius:12px;overflow:hidden;background:#000}
 .paperview video{width:100%;display:block}
 .paperview.mirror video{transform:scaleX(-1)}
@@ -167,7 +176,7 @@ svg text{fill:var(--muted);font-family:var(--font-num);font-size:11px}
       <h1>얼굴 수평계 <span class="sub">실험실</span></h1>
       <div class="sub">4주 동안 매일 측정해서, 폰 카메라가 내 얼굴을 얼마나 정확하게 재는지 증명해요.</div>
     </div>
-    <div class="sub" id="engineState">준비 전</div>
+    <div class="row"><button class="primary" id="btnLabOpen">🧪 정답 시험실</button><span class="sub" id="engineState">준비 전</span></div>
   </header>
 
   <section class="panel" id="regBox" hidden aria-label="로그인">
@@ -345,23 +354,11 @@ svg text{fill:var(--muted);font-family:var(--font-num);font-size:11px}
     </div>
   </section>
 
-  <section class="panel" id="paperPanel" aria-label="정답 시험실">
-    <h2>정답 시험실 (종이 + 각도기)</h2>
-    <div class="note">정답을 우리가 정해 놓고 앱이 맞히는지 보는 곳이에요. 내 얼굴 기록과는 따로 저장돼요. 사진은 이 폰 안에서만 쓰고 보내지 않아요(결과 숫자만 시트로 가요).</div>
-    <div class="memo">
-      <b>1단계 · 정답 종이 만들기</b>
-      <div class="note">최대한 정면인 내 사진 1장을 고르면, 앱이 <b>완전 대칭(0mm)</b>과 <b>턱만 1·3·5mm 옮긴</b> 얼굴 4장을 만들어요. 데칼코마니라서 사진이 조금 삐뚤어도 정답은 그대로예요.</div>
-      <div class="row">
-        <button class="primary" id="btnPaperPick">정면 사진 고르기</button>
-        <input type="file" id="paperFile" accept="image/*" hidden>
-        <button id="btnPaperLast" disabled>방금 측정한 얼굴로</button>
-      </div>
-      <div class="paperprev" id="paperPrev"></div>
-      <div class="row"><button id="btnPaperPdf" disabled>PDF로 저장 (4장, 인쇄용)</button><button id="btnPaperPng" disabled>그림 4장으로 저장</button></div>
-      <div class="note" id="paperMakeMsg"></div>
-    </div>
+  <section class="panel lab" id="paperPanel" aria-label="정답 시험실" hidden>
+    <div class="labhead"><h2>🧪 정답 시험실</h2><button id="btnLabClose">✕ 닫기</button></div>
+    <div class="labcam"><div class="paperview" id="paperView"><video id="paperVid" playsinline muted></video><div class="pvtag" id="paperVidTag">카메라 꺼짐</div><div class="pvoff" id="paperOff">아래 버튼을 누르면 카메라가 켜져요</div></div>
     <div class="memo guide" id="paperGuideBox">
-      <b>2단계 · 따라 하기</b>
+      <b>지금 할 일</b>
       <details class="note"><summary>처음이면 먼저 읽기: 자리 잡는 법</summary>
         <svg viewBox="0 0 320 150" width="100%" role="img" aria-label="위에서 본 자리 배치: 벽에 종이, 50~60cm 앞 책상 위 각도기에 폰">
           <rect x="10" y="10" width="300" height="10" fill="var(--muted)"/><text x="14" y="38">벽</text>
@@ -377,8 +374,20 @@ svg text{fill:var(--muted);font-family:var(--font-num);font-size:11px}
         5) 종이에 <b>불빛 반사</b>가 없게.<br>
         6) <b>"내 얼굴"</b> 단계에서는 뒤통수를 <b>벽에 딱 붙이고</b> 앉아요. 폰은 그대로 각도기 위, 앞면 카메라로 나를 봐요.
       </details>
-      <div class="paperview" id="paperView" hidden><video id="paperVid" playsinline muted></video><div class="pvtag" id="paperVidTag"></div></div>
       <div class="guidecard" id="paperGuide"></div>
+    </div></div>
+    <div class="note">정답을 우리가 정해 놓고 앱이 맞히는지 보는 곳이에요. 내 얼굴 기록과는 따로 저장돼요. 사진은 이 폰 안에서만 쓰고 보내지 않아요(결과 숫자만 시트로 가요).</div>
+    <div class="memo">
+      <b>1단계 · 정답 종이 만들기</b>
+      <div class="note">최대한 정면인 내 사진 1장을 고르면, 앱이 <b>완전 대칭(0mm)</b>과 <b>턱만 1·3·5mm 옮긴</b> 얼굴 4장을 만들어요. 데칼코마니라서 사진이 조금 삐뚤어도 정답은 그대로예요.</div>
+      <div class="row">
+        <button class="primary" id="btnPaperPick">정면 사진 고르기</button>
+        <input type="file" id="paperFile" accept="image/*" hidden>
+        <button id="btnPaperLast" disabled>방금 측정한 얼굴로</button>
+      </div>
+      <div class="paperprev" id="paperPrev"></div>
+      <div class="row"><button id="btnPaperPdf" disabled>PDF로 저장 (4장, 인쇄용)</button><button id="btnPaperPng" disabled>그림 4장으로 저장</button></div>
+      <div class="note" id="paperMakeMsg"></div>
     </div>
     <div class="memo">
       <b>직접 고르기 (안내 없이)</b>
@@ -1176,7 +1185,7 @@ async function startCamera(){
   stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:facing,width:{ideal:1920},height:{ideal:1080}}});
   video.srcObject=stream; await video.play();
   $('stage').classList.toggle('mirror', facing==='user');
-  try{ const pv=$('paperVid'); pv.srcObject=stream; pv.play().catch(()=>{}); $('paperView').classList.toggle('mirror', facing==='user'); $('paperVidTag').textContent=facing==='user'?'앞면 카메라':'뒷면 카메라'; }catch(e){}
+  try{ const pv=$('paperVid'); pv.srcObject=stream; pv.play().catch(()=>{}); $('paperView').classList.toggle('mirror', facing==='user'); $('paperVidTag').textContent=facing==='user'?'앞면 카메라':'뒷면 카메라'; $('paperOff').hidden=true; }catch(e){}
   overlay.width=video.videoWidth; overlay.height=video.videoHeight;
   proc.width=Math.min(1280,video.videoWidth); proc.height=Math.round(proc.width*video.videoHeight/video.videoWidth);
   $('stage').style.aspectRatio=`${video.videoWidth}/${video.videoHeight}`;
@@ -1826,7 +1835,8 @@ $('btnPaperPdf').onclick=async()=>{ if(!paperSet) return;
 $('btnPaperPng').onclick=()=>{ if(!paperSet) return; paperSet.sheets.forEach((x,i)=>setTimeout(()=>{ const a=document.createElement('a'); a.href=x.page.toDataURL('image/png'); a.download=`정답종이_${paperSet.id}_${i+1}_${x.mm}mm.png`; a.click(); },i*400)); };
 // 종이 재기: 카메라 화면을 12번 찍어 분석, 가운데 값
 async function paperMeasure(){
-  const sv=$('paperSheet').value, mm=sv==='face'?'face':+sv, ang=+$('paperAngle').value, msg=$('paperMeasureMsg');
+  const sv=$('paperSheet').value, mm=sv==='face'?'face':+sv, ang=+$('paperAngle').value, msg0=$('paperMeasureMsg');
+  const msg={ set textContent(v){ msg0.textContent=v; const g=$('paperStepMsg'); if(g) g.textContent=v; }, get textContent(){ return msg0.textContent; } };
   $('btnPaperMeasure').disabled=true;
   try{
     const ok=await ensureRunning(); if(!ok){ msg.textContent='카메라를 켜지 못했어요.'; return; }
@@ -1840,11 +1850,26 @@ async function paperMeasure(){
       yaw:fr[0].pose?med(r=>r.pose.yaw):null, pitch:fr[0].pose?med(r=>r.pose.pitch):null, roll:fr[0].pose?med(r=>r.pose.roll):null, mmpp:med(r=>r.mmpp)};
     paperDB().tests.push(T); save(); renderPaper();
     msg.textContent=`${sheetName(mm)} · 폰 ${ang}° → 앱이 읽은 턱 ${T.E.chin>=0?'+':''}${T.E.chin.toFixed(2)}mm (흔들림 ±${T.chinSd.toFixed(2)}). 다음 종이나 각도로 바꿔서 또 재요.`;
+    paperLast=`✅ 방금 잰 것: ${sheetName(mm)} · 폰 ${ang}° → 턱 ${T.E.chin>=0?'+':''}${T.E.chin.toFixed(2)}mm`; renderPaper();
     if(store.shareOK&&sheetUrl()) fetch(sheetUrl(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({v:1,tab:`${store.name}_종이시험_${devId()}`,n:paperDB().tests.length,csv:paperCsv()})}).catch(()=>{});
   }catch(e){ msg.textContent='재다가 문제가 생겼어요: '+(e&&e.message||e); }
   finally{ $('btnPaperMeasure').disabled=false; const bs=$('btnPaperStep'); if(bs) bs.disabled=false; }
 }
 $('btnPaperMeasure').onclick=paperMeasure;
+// 전용 화면으로 열기: 열 때 지금 단계에 맞는 카메라를 바로 켠다
+async function openLab(){
+  $('paperPanel').hidden=false; document.body.classList.add('labopen'); $('paperPanel').scrollTop=0; renderPaper();
+  const P0=paperDB(); if(!P0.cur) return;
+  const T=P0.tests.filter(t=>t.set===P0.cur), st=GUIDE.find(g=>T.filter(t=>t.sheet===g.sheet&&t.angle===g.ang).length<g.need);
+  const want=st&&st.sheet==='face'?'user':'environment';
+  if($('camSel').value!==want){ $('camSel').value=want; if(running) await startCamera(); }
+  if(!running){ const ok=await ensureRunning(); if(!ok){ $('paperOff').textContent=$('engineState').textContent||'카메라를 켜지 못했어요'; return; } }
+  else { try{ const pv=$('paperVid'); pv.srcObject=stream; pv.play().catch(()=>{}); $('paperOff').hidden=true; }catch(e){} }
+  renderPaper();
+}
+function closeLab(){ $('paperPanel').hidden=true; document.body.classList.remove('labopen'); }
+$('btnLabOpen').onclick=openLab; $('btnLabClose').onclick=closeLab;
+let paperLast='';
 function sheetName(mm){ return mm==='face'?'내 얼굴':`${'①②③④'[PAPER_MM.indexOf(mm)]} ${mm}mm 종이`; }
 // 따라 하기 순서: 종이 4장(0°) → ③ 3mm 종이로 각도 → 내 얼굴로 각도(각 3번)
 const GUIDE=[
@@ -1864,7 +1889,7 @@ const GUIDE=[
 ];
 function renderGuide(T){
   const box=$('paperGuide'); if(!box) return; const P0=paperDB();
-  if(!P0.cur){ box.innerHTML='<div class="big">먼저 1단계에서 정답 종이를 만들어 주세요.</div>'; return; }
+  if(!P0.cur){ box.innerHTML='<div class="big">먼저 아래 <b>1단계</b>에서 정면 사진을 골라 정답 종이를 만들고 인쇄해 주세요.</div>'; return; }
   const done=st=>T.filter(t=>t.sheet===st.sheet&&t.angle===st.ang).length;
   const total=GUIDE.reduce((a,st)=>a+st.need,0), got=GUIDE.reduce((a,st)=>a+Math.min(st.need,done(st)),0);
   const i=GUIDE.findIndex(st=>done(st)<st.need);
@@ -1873,9 +1898,8 @@ function renderGuide(T){
   const st=GUIDE[i], face=st.sheet==='face', k=done(st);
   box.innerHTML=`<div class="sub">단계 ${i+1}/${GUIDE.length}</div><div class="big">${st.say}</div>
     <div class="note">카메라: <b>${face?'앞면(셀카)':'뒷면'}</b> · 준비되면 아래 버튼을 누르고 2~3초 동안 폰을 건드리지 마세요.${st.need>1?` (${k}/${st.need}번 했어요)`:''}</div>
-    <button class="primary big" id="btnPaperStep"></button>${bar}`;
+    <button class="primary big" id="btnPaperStep"></button>${paperLast?`<div class="note"><b>${paperLast}</b></div>`:''}<div class="note" id="paperStepMsg"></div>${bar}`;
   const want=face?'user':'environment', ready=running&&$('camSel').value===want;
-  $('paperView').hidden=!running;
   $('btnPaperStep').textContent=!running?'① 카메라 켜기':!ready?`① ${face?'앞면':'뒷면'} 카메라로 바꾸기`:'② 화면 보고 맞춘 뒤 → 이대로 재기';
   $('btnPaperStep').onclick=async()=>{
     $('btnPaperStep').disabled=true; $('paperSheet').value=String(st.sheet); $('paperAngle').value=String(st.ang);
@@ -1883,7 +1907,6 @@ function renderGuide(T){
       if(!ready){
         $('camSel').value=want;
         if(running) await startCamera(); else { const ok=await ensureRunning(); if(!ok){ $('paperMeasureMsg').textContent=$('engineState').textContent||'카메라를 켜지 못했어요.'; return; } }
-        $('paperView').hidden=false; $('paperView').scrollIntoView({behavior:'smooth',block:'center'});
         $('paperMeasureMsg').textContent=face?'미리보기에 내 얼굴이 가운데 크게 보이게 맞춘 뒤 "이대로 재기"를 눌러요.':'미리보기에 종이 얼굴이 가운데 크게 보이게 맞춘 뒤 "이대로 재기"를 눌러요.';
         renderPaper(); return;
       }
