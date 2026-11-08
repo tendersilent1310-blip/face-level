@@ -176,7 +176,7 @@ svg text{fill:var(--muted);font-family:var(--font-num);font-size:11px}
 <div class="wrap">
   <header>
     <div>
-      <h1>얼굴 수평계 <span class="sub">실험실 · 버전 <span id="appVer">11.08-f</span></span></h1>
+      <h1>얼굴 수평계 <span class="sub">실험실 · 버전 <span id="appVer">11.08-g</span></span></h1>
       <div class="sub">4주 동안 매일 측정해서, 폰 카메라가 내 얼굴을 얼마나 정확하게 재는지 증명해요.</div>
     </div>
     <div class="row"><button class="primary" id="btnLabOpen">🧪 정답 시험실</button><span class="sub" id="engineState">준비 전</span></div>
@@ -1839,7 +1839,9 @@ $('btnPaperPdf').onclick=async()=>{ if(!paperSet) return;
   }catch(e){ $('paperMakeMsg').textContent='PDF 저장 실패: '+(e.message||e)+' → "그림 4장으로 저장"을 써 주세요.'; } };
 $('btnPaperPng').onclick=()=>{ if(!paperSet) return; paperSet.sheets.forEach((x,i)=>setTimeout(()=>{ const a=document.createElement('a'); a.href=x.page.toDataURL('image/png'); a.download=`정답종이_${paperSet.id}_${i+1}_${x.mm}mm.png`; a.click(); },i*400)); };
 // 종이 재기: 카메라 화면을 12번 찍어 분석, 가운데 값
+let paperBusy=false, okSince=0, coolUntil=0;
 async function paperMeasure(){
+  if(paperBusy) return; paperBusy=true;
   const sv=$('paperSheet').value, mm=sv==='face'?'face':+sv, ang=+$('paperAngle').value, msg0=$('paperMeasureMsg');
   const msg={ set textContent(v){ msg0.textContent=v; const g=$('paperStepMsg'); if(g) g.textContent=v; }, get textContent(){ return msg0.textContent; } };
   $('btnPaperMeasure').disabled=true;
@@ -1858,7 +1860,7 @@ async function paperMeasure(){
     paperLast=`✅ 방금 잰 것: ${sheetName(mm)} · 폰 ${ang}° → 턱 ${T.E.chin>=0?'+':''}${T.E.chin.toFixed(2)}mm`; renderPaper();
     if(store.shareOK&&sheetUrl()) fetch(sheetUrl(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({v:1,tab:`${store.name}_종이시험_${devId()}`,n:paperDB().tests.length,csv:paperCsv()})}).catch(()=>{});
   }catch(e){ msg.textContent='재다가 문제가 생겼어요: '+(e&&e.message||e); }
-  finally{ $('btnPaperMeasure').disabled=false; const bs=$('btnPaperStep'); if(bs) bs.disabled=false; }
+  finally{ paperBusy=false; okSince=0; coolUntil=performance.now()+2500; $('btnPaperMeasure').disabled=false; const bs=$('btnPaperStep'); if(bs) bs.disabled=false; }
 }
 $('btnPaperMeasure').onclick=paperMeasure;
 // 전용 화면으로 열기: 열 때 지금 단계에 맞는 카메라를 바로 켠다
@@ -1866,7 +1868,8 @@ async function openLab(){
   $('paperPanel').hidden=false; document.body.classList.add('labopen'); $('paperPanel').scrollTop=0; renderPaper();
   const P0=paperDB(); if(!P0.cur) return;
   const T=P0.tests.filter(t=>t.set===P0.cur), st=GUIDE.find(g=>T.filter(t=>t.sheet===g.sheet&&t.angle===g.ang).length<g.need);
-  const want=st&&st.sheet==='face'?'user':'environment';
+  const si=P0.sets.find(x=>x.id===P0.cur)||{};
+  const want=st&&st.sheet==='face'&&si.faceReady?'user':'environment';
   if($('camSel').value!==want){ $('camSel').value=want; if(running) await startCamera(); }
   if(!running){ const ok=await ensureRunning(); if(!ok){ $('paperOff').textContent=$('engineState').textContent||'카메라를 켜지 못했어요'; return; } }
   else { try{ const pv=$('paperVid'); pv.srcObject=stream; pv.play().catch(()=>{}); $('paperOff').hidden=true; }catch(e){} }
@@ -1881,9 +1884,14 @@ setInterval(()=>{
   if(!liveS||!liveS.face||!liveS.pose){ box.className='angbox no'; box.textContent='얼굴을 찾는 중… 화면 가운데로 와 주세요'; return; }
   const base=T.filter(t=>t.sheet==='face'&&t.angle===0&&t.yaw!=null).map(t=>t.yaw), target=Math.abs(st.ang);
   const now=base.length?Math.abs(liveS.pose.yaw-median(base)):Math.abs(liveS.pose.yaw);
-  const ok=Math.abs(now-target)<=1.5;
+  const ok=Math.abs(now-target)<=1.5, t=performance.now();
   box.className='angbox '+(ok?'ok':'no');
-  box.textContent=`지금 ${now.toFixed(1)}° · 목표 ${target}° ${ok?'✅ 이대로 재기!':now<target?'→ 조금 더 돌려요':'← 조금 덜 돌려요'}`;
+  if(paperBusy){ box.textContent='📸 재는 중… 그대로 멈춰 주세요'; return; }
+  if(t<coolUntil){ box.textContent='✅ 찍었어요! 잠깐 쉬어요…'; okSince=0; return; }
+  if(ok){ if(!okSince) okSince=t; const left=Math.max(0,1.5-(t-okSince)/1000);
+    box.textContent=`지금 ${now.toFixed(1)}° ✅ 그대로! ${left.toFixed(1)}초 뒤 자동으로 재요`;
+    if(left<=0&&$('camSel').value==='user'){ $('paperSheet').value='face'; $('paperAngle').value=String(st.ang); paperMeasure(); }
+  } else { okSince=0; box.textContent=`지금 ${now.toFixed(1)}° · 목표 ${target}° ${now<target?'→ 조금 더 돌려요':'← 조금 덜 돌려요'}`; }
 },250);
 $('btnLabOpen').onclick=openLab; $('btnLabClose').onclick=closeLab;
 $('btnPvFlip').onclick=async()=>{ $('btnPvFlip').disabled=true; try{ $('camSel').value=$('camSel').value==='user'?'environment':'user'; if(running) await startCamera(); else await ensureRunning(); }catch(e){} finally{ $('btnPvFlip').disabled=false; renderPaper(); } };
@@ -1936,7 +1944,7 @@ function renderGuide(T){
     return;
   }
   box.innerHTML=`<div class="sub">단계 ${i+1}/${GUIDE.length}</div><div class="big">${st.say}</div>
-    <div class="note">카메라: <b>${face?'앞면(셀카)':'뒷면'}</b> · 준비되면 아래 버튼을 누르고 2~3초 동안 ${face?'고개를 멈춰 주세요':'폰과 책을 건드리지 마세요'}.${st.need>1?` (${k}/${st.need}번 했어요)`:''}</div>
+    <div class="note">카메라: <b>${face?'앞면(셀카)':'뒷면'}</b> · ${face?'숫자가 초록색으로 1.5초 유지되면 <b>자동으로</b> 찍어요. 버튼을 안 눌러도 돼요':'준비되면 아래 버튼을 누르고 2~3초 동안 폰과 책을 건드리지 마세요'}.${st.need>1?` (${k}/${st.need}번 했어요)`:''}</div>
     ${face?'<div class="angbox" id="angBox">얼굴을 찾는 중…</div>':''}
     <button class="primary big" id="btnPaperStep"></button>${paperLast?`<div class="note"><b>${paperLast}</b></div>`:''}<div class="note" id="paperStepMsg"></div>${bar}`;
   const want=face?'user':'environment', ready=running&&$('camSel').value===want;
