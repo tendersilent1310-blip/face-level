@@ -173,7 +173,7 @@ svg text{fill:var(--muted);font-family:var(--font-num);font-size:11px}
 <div class="wrap">
   <header>
     <div>
-      <h1>얼굴 수평계 <span class="sub">실험실</span></h1>
+      <h1>얼굴 수평계 <span class="sub">실험실 · 버전 <span id="appVer">11.08-c</span></span></h1>
       <div class="sub">4주 동안 매일 측정해서, 폰 카메라가 내 얼굴을 얼마나 정확하게 재는지 증명해요.</div>
     </div>
     <div class="row"><button class="primary" id="btnLabOpen">🧪 정답 시험실</button><span class="sub" id="engineState">준비 전</span></div>
@@ -2378,7 +2378,7 @@ $('fileImport').onchange=async e=>{
     :`불러오지 못했어요: 고른 파일 ${files.length}개에 측정 기록이 없어요${emptyN?`(빈 파일 ${emptyN}개)`:''}${badN?`(얼굴 수평계 파일이 아닌 것 ${badN}개)`:''}. 다운로드 폴더의 "얼굴수평계_…csv" 파일들을 골라 주세요.`;
   $('importMsg').textContent=msg; setMsg(msg);
 };
-try{ if('serviceWorker' in navigator && location.protocol==='https:') navigator.serviceWorker.register('sw.js'); }catch(e){}
+try{ if('serviceWorker' in navigator && location.protocol==='https:') navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }catch(e){}
 // 저장 상태 표시: 기록이 몇 개 있는지, 브라우저가 지우지 않게 '영구 보관' 허락을 받았는지
 async function storageStatus(){
   let persisted=null; try{ if(navigator.storage&&navigator.storage.persist){ persisted=await navigator.storage.persisted(); if(!persisted) persisted=await navigator.storage.persist(); } }catch(e){}
