@@ -360,19 +360,19 @@ svg text{fill:var(--muted);font-family:var(--font-num);font-size:11px}
     <div class="memo guide" id="paperGuideBox">
       <b>지금 할 일</b>
       <details class="note"><summary>처음이면 먼저 읽기: 자리 잡는 법</summary>
-        <svg viewBox="0 0 320 150" width="100%" role="img" aria-label="위에서 본 자리 배치: 벽에 종이, 50~60cm 앞 책상 위 각도기에 폰">
-          <rect x="10" y="10" width="300" height="10" fill="var(--muted)"/><text x="14" y="38">벽</text>
-          <rect x="140" y="20" width="40" height="8" fill="#fff" stroke="var(--ink)"/><text x="210" y="50">종이 얼굴</text>
-          <line x1="160" y1="30" x2="160" y2="110" stroke="var(--muted)" stroke-dasharray="4 4"/><text x="170" y="80">50~60cm</text>
-          <path d="M110 130 A50 50 0 0 1 210 130 Z" fill="var(--tube)" stroke="var(--ink)"/><text x="215" y="140">각도기</text>
-          <rect x="152" y="112" width="16" height="22" rx="3" fill="var(--accent)"/><text x="160" y="148" text-anchor="middle">폰</text>
+        <svg viewBox="0 0 320 170" width="100%" role="img" aria-label="위에서 본 배치: 각도기 위에 종이를 붙인 책, 50~60cm 앞에 고정한 폰">
+          <path d="M100 60 A60 60 0 0 1 220 60 Z" fill="var(--tube)" stroke="var(--ink)" transform="translate(0,0)"/><text x="228" y="62">각도기</text>
+          <rect x="140" y="52" width="40" height="8" fill="#fff" stroke="var(--ink)" transform="rotate(-8 160 56)"/><text x="160" y="20" text-anchor="middle">종이 붙인 책 (이걸 돌려요)</text>
+          <line x1="160" y1="64" x2="160" y2="128" stroke="var(--muted)" stroke-dasharray="4 4"/><text x="170" y="100">50~60cm</text>
+          <rect x="152" y="130" width="16" height="24" rx="3" fill="var(--accent)"/><text x="160" y="166" text-anchor="middle">폰 (고정)</text>
+          <circle cx="125" cy="142" r="4" fill="#ff6b9a"/><circle cx="195" cy="142" r="4" fill="#ff6b9a"/><text x="200" y="146">스티커(내 얼굴용)</text>
         </svg>
-        1) 종이를 <b>눈높이쯤 벽</b>에 네 귀퉁이까지 평평하게 붙여요.<br>
-        2) 그 앞 책상에 <b>각도기</b>를 깔아요. 곧은 밑변을 벽과 나란히.<br>
-        3) 폰을 각도기 <b>가운데</b>에 똑바로 세워요(컵·책에 기대지 말고 세워지는 케이스나 거치대).<br>
-        4) 종이까지 <b>50~60cm</b>. 종이 얼굴이 화면 가운데에 오게.<br>
+        1) 종이를 <b>두꺼운 책 표지나 상자</b>에 평평하게 붙여 책상에 세워요.<br>
+        2) 각도기를 <b>그 책 밑</b>에 깔아요. 책 가운데가 각도기 중심, 종이가 <b>90 눈금</b> 쪽(폰)을 보게.<br>
+        3) <b>폰은 거치대에 고정</b>하고 책에서 <b>50~60cm</b>. 폰은 끝까지 움직이지 않아요.<br>
+        4) "오른쪽 5°"는 <b>책을</b> 각도기 위에서 5칸 돌리는 거예요. 종이 얼굴은 화면 가운데에 그대로 있어요.<br>
         5) 종이에 <b>불빛 반사</b>가 없게.<br>
-        6) <b>"내 얼굴"</b> 단계에서는 뒤통수를 <b>벽에 딱 붙이고</b> 앉아요. 폰은 그대로 각도기 위, 앞면 카메라로 나를 봐요.
+        6) <b>내 얼굴</b> 단계: 폰 카메라 옆 <b>5cm·10cm</b>(양쪽)에 작은 스티커를 붙이고, <b>코끝이 스티커를 향하게</b> 고개만 돌려요(55cm 거리에서 5cm≈5°, 10cm≈10°). 정확한 각도는 앱이 직접 재요.
       </details>
       <div class="guidecard" id="paperGuide"></div>
     </div></div>
@@ -391,11 +391,11 @@ svg text{fill:var(--muted);font-family:var(--font-num);font-size:11px}
     </div>
     <div class="memo">
       <b>직접 고르기 (안내 없이)</b>
-      <div class="note">종이 한 장을 벽에 붙이고, 그 앞 책상에 각도기를 깔아요. 폰을 각도기 가운데에 세워 <b>뒷면 카메라</b>로 종이를 봐요(50~60cm). 아래에서 붙인 종이와 지금 폰 각도를 고르고 "재기"를 누르면 2~3초 동안 재요.</div>
+      <div class="note">안내 없이 직접 고를 때 쓰는 칸이에요. 종이(책)는 각도기 위, 폰은 고정. 붙인 종이와 책을 돌린 각도를 고르고 "재기"를 누르면 2~3초 동안 재요.</div>
       <div class="row">
         <label class="sub" for="paperSheet">붙인 종이</label>
         <select id="paperSheet"><option value="0">① 0mm (대칭)</option><option value="1">② 1mm</option><option value="3">③ 3mm</option><option value="5">④ 5mm</option><option value="face">내 얼굴 (각도 시험)</option></select>
-        <label class="sub" for="paperAngle">폰 각도(각도기)</label>
+        <label class="sub" for="paperAngle">돌린 각도</label>
         <select id="paperAngle"><option value="-10">왼쪽 10°</option><option value="-5">왼쪽 5°</option><option value="0" selected>0° (정면)</option><option value="5">오른쪽 5°</option><option value="10">오른쪽 10°</option></select>
         <button class="primary" id="btnPaperMeasure">재기</button>
       </div>
@@ -1873,19 +1873,19 @@ let paperLast='';
 function sheetName(mm){ return mm==='face'?'내 얼굴':`${'①②③④'[PAPER_MM.indexOf(mm)]} ${mm}mm 종이`; }
 // 따라 하기 순서: 종이 4장(0°) → ③ 3mm 종이로 각도 → 내 얼굴로 각도(각 3번)
 const GUIDE=[
-  {sheet:0,ang:0,need:1,say:'① 0mm 종이를 벽에 붙이고, 폰은 각도기 0°에 두세요.'},
-  {sheet:5,ang:0,need:1,say:'같은 자리에 ④ 5mm 종이로 바꿔 붙이세요. 폰은 그대로 0°.'},
-  {sheet:1,ang:0,need:1,say:'② 1mm 종이로 바꿔 붙이세요. 폰은 그대로 0°.'},
-  {sheet:3,ang:0,need:1,say:'③ 3mm 종이로 바꿔 붙이세요. 폰은 그대로 0°. 이 종이는 끝까지 그대로 둬요.'},
-  {sheet:3,ang:5,need:1,say:'종이는 그대로. 폰만 각도기 <b>오른쪽 5°</b>로 돌리세요.'},
-  {sheet:3,ang:10,need:1,say:'폰만 <b>오른쪽 10°</b>로 돌리세요.'},
-  {sheet:3,ang:-5,need:1,say:'폰만 <b>왼쪽 5°</b>로 돌리세요.'},
-  {sheet:3,ang:-10,need:1,say:'폰만 <b>왼쪽 10°</b>로 돌리세요. 종이 시험은 이게 마지막이에요.'},
-  {sheet:'face',ang:0,need:3,say:'이제 <b>내 얼굴</b>이에요. 종이를 떼고 그 벽에 <b>뒤통수를 붙이고</b> 앉으세요. 폰은 각도기 <b>0°</b>, 앞면 카메라로 나를 봐요. 3번 재요.'},
-  {sheet:'face',ang:5,need:3,say:'고개는 그대로. 폰만 <b>오른쪽 5°</b>로 돌리세요. 3번 재요.'},
-  {sheet:'face',ang:10,need:3,say:'폰만 <b>오른쪽 10°</b>. 3번 재요.'},
-  {sheet:'face',ang:-5,need:3,say:'폰만 <b>왼쪽 5°</b>. 3번 재요.'},
-  {sheet:'face',ang:-10,need:3,say:'폰만 <b>왼쪽 10°</b>. 3번 재요. 마지막이에요!'}
+  {sheet:0,ang:0,need:1,say:'① 0mm 종이를 <b>책(또는 상자)</b>에 붙여 각도기 위 <b>90 눈금(정면)</b>에 세우세요. 폰은 거치대에 고정해요.'},
+  {sheet:5,ang:0,need:1,say:'같은 자리에 ④ 5mm 종이로 바꿔 붙이세요. 책은 정면 그대로.'},
+  {sheet:1,ang:0,need:1,say:'② 1mm 종이로 바꿔 붙이세요. 책은 정면 그대로.'},
+  {sheet:3,ang:0,need:1,say:'③ 3mm 종이로 바꿔 붙이세요. 책은 정면 그대로. 이 종이는 끝까지 그대로 둬요.'},
+  {sheet:3,ang:5,need:1,say:'폰은 그대로. <b>책을</b> 각도기 위에서 <b>오른쪽으로 5칸</b> 돌리세요(폰에서 볼 때 종이 얼굴이 오른쪽을 보게).'},
+  {sheet:3,ang:10,need:1,say:'<b>책을 오른쪽으로 10칸</b> 돌리세요.'},
+  {sheet:3,ang:-5,need:1,say:'<b>책을 왼쪽으로 5칸</b> 돌리세요.'},
+  {sheet:3,ang:-10,need:1,say:'<b>책을 왼쪽으로 10칸</b> 돌리세요. 종이 시험은 이게 마지막이에요.'},
+  {sheet:'face',ang:0,need:3,say:'이제 <b>내 얼굴</b>이에요. 폰은 그대로 두고 그 앞(50~60cm)에 앉아 <b>코끝이 카메라</b>를 향하게 해요. 3번 재요.'},
+  {sheet:'face',ang:5,need:3,say:'<b>코끝을 오른쪽 5cm 스티커</b>로 향하게 고개만 살짝 돌려요. 3번 재요.'},
+  {sheet:'face',ang:10,need:3,say:'<b>코끝을 오른쪽 10cm 스티커</b>로. 3번 재요.'},
+  {sheet:'face',ang:-5,need:3,say:'<b>코끝을 왼쪽 5cm 스티커</b>로. 3번 재요.'},
+  {sheet:'face',ang:-10,need:3,say:'<b>코끝을 왼쪽 10cm 스티커</b>로. 3번 재요. 마지막이에요!'}
 ];
 function renderGuide(T){
   const box=$('paperGuide'); if(!box) return; const P0=paperDB();
@@ -1897,7 +1897,7 @@ function renderGuide(T){
   if(i<0){ box.innerHTML=`<div class="big">다 했어요! 🎉</div>${bar}<div class="note">아래 결과 표를 캡처해서 보내 주거나 "결과 CSV"를 보내 주세요. 시트에도 자동으로 올라갔어요.</div>`; return; }
   const st=GUIDE[i], face=st.sheet==='face', k=done(st);
   box.innerHTML=`<div class="sub">단계 ${i+1}/${GUIDE.length}</div><div class="big">${st.say}</div>
-    <div class="note">카메라: <b>${face?'앞면(셀카)':'뒷면'}</b> · 준비되면 아래 버튼을 누르고 2~3초 동안 폰을 건드리지 마세요.${st.need>1?` (${k}/${st.need}번 했어요)`:''}</div>
+    <div class="note">카메라: <b>${face?'앞면(셀카)':'뒷면'}</b> · 준비되면 아래 버튼을 누르고 2~3초 동안 ${face?'고개를 멈춰 주세요':'폰과 책을 건드리지 마세요'}.${st.need>1?` (${k}/${st.need}번 했어요)`:''}</div>
     <button class="primary big" id="btnPaperStep"></button>${paperLast?`<div class="note"><b>${paperLast}</b></div>`:''}<div class="note" id="paperStepMsg"></div>${bar}`;
   const want=face?'user':'environment', ready=running&&$('camSel').value===want;
   $('btnPaperStep').textContent=!running?'① 카메라 켜기':!ready?`① ${face?'앞면':'뒷면'} 카메라로 바꾸기`:'② 화면 보고 맞춘 뒤 → 이대로 재기';
@@ -1936,7 +1936,7 @@ function renderPaper(){
   if(rows.length){
     h+=`<div class="tablewrap"><table><thead><tr><th>종이 · 폰 각도</th><th>앱이 잰 돌림(0° 대비)</th><th>턱이 가짜로 변한 양</th><th>코가 가짜로 변한 양</th></tr></thead><tbody>`;
     for(const r of rows) h+=`<tr><td>${sheetName(r.mm)} · ${r.an>0?'오른쪽':'왼쪽'} ${Math.abs(r.an)}°</td><td>${r.yaw==null?'—':(r.yaw>=0?'+':'')+r.yaw.toFixed(1)+'°'}</td><td>${f2(r.chin)}mm</td><td>${f2(r.nose)}mm</td></tr>`;
-    h+=`</tbody></table></div><div class="note">각도기로 돌린 만큼 "앱이 잰 돌림"이 나오면 각도 측정이 맞는 거예요. 턱·코 칸은 <b>폰이 그만큼 틀어지면 가짜 비대칭이 몇 mm 생기는지</b>예요. 종이는 납작해서 진짜 얼굴보다 작게 나올 수 있어요. <b>내 얼굴</b> 줄과 비교해 보세요.</div>`;
+    h+=`</tbody></table></div><div class="note">각도기로 돌린 만큼 "앱이 잰 돌림"이 나오면 각도 측정이 맞는 거예요. 턱·코 칸은 <b>얼굴이 그만큼 돌아가 있으면 가짜 비대칭이 몇 mm 생기는지</b>예요. 종이는 납작해서 진짜 얼굴보다 작게 나올 수 있어요. <b>내 얼굴</b> 줄과 비교해 보세요.</div>`;
   } else h+=`<div class="note">각도 영향을 보려면 같은 종이를 폰 0°와 5°·10°로 재 주세요.</div>`;
   box.innerHTML=h;
 }
