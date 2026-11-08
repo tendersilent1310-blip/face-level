@@ -355,7 +355,8 @@ svg text{fill:var(--muted);font-family:var(--font-num);font-size:11px}
   </section>
 
   <section class="panel lab" id="paperPanel" aria-label="정답 시험실" hidden>
-    <div class="labhead"><h2>🧪 정답 시험실</h2><button id="btnLabClose">✕ 닫기</button></div>
+    <div class="labhead"><h2>🧪 정답 시험실</h2><div class="row"><button id="btnLabReset">↺ 처음부터 다시</button><button id="btnLabClose">✕ 닫기</button></div></div>
+    <div class="confirm" id="labResetAsk" hidden><span>지금까지 잰 시험 결과를 지우고 <b>1단계부터</b> 다시 할까요? 만들어 둔 정답 종이(세트)는 그대로 둬요.</span><button class="danger" id="labResetYes">네, 다시 할게요</button><button id="labResetNo">아니요</button></div>
     <div class="labcam"><div class="paperview" id="paperView"><video id="paperVid" playsinline muted></video><div class="pvtag" id="paperVidTag">카메라 꺼짐</div><div class="pvoff" id="paperOff">아래 버튼을 누르면 카메라가 켜져요</div></div>
     <div class="memo guide" id="paperGuideBox">
       <b>지금 할 일</b>
@@ -1869,6 +1870,10 @@ async function openLab(){
 }
 function closeLab(){ $('paperPanel').hidden=true; document.body.classList.remove('labopen'); }
 $('btnLabOpen').onclick=openLab; $('btnLabClose').onclick=closeLab;
+$('btnLabReset').onclick=()=>{ $('labResetAsk').hidden=false; };
+$('labResetNo').onclick=()=>{ $('labResetAsk').hidden=true; };
+$('labResetYes').onclick=()=>{ const P0=paperDB(); P0.tests=P0.tests.filter(t=>t.set!==P0.cur); paperLast=''; save(); $('labResetAsk').hidden=true; $('paperMeasureMsg').textContent='';
+  renderPaper(); const g=$('paperStepMsg'); if(g) g.textContent='처음부터 다시 시작해요. 단계 1부터 해 주세요.'; $('paperPanel').scrollTop=0; };
 let paperLast='';
 function sheetName(mm){ return mm==='face'?'내 얼굴':`${'①②③④'[PAPER_MM.indexOf(mm)]} ${mm}mm 종이`; }
 // 따라 하기 순서: 종이 4장(0°) → ③ 3mm 종이로 각도 → 내 얼굴로 각도(각 3번)
