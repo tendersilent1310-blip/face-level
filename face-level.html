@@ -58,6 +58,7 @@ h2{font-size:15px;margin:0;font-weight:600}
 .labcam{position:sticky;top:52px;z-index:2;background:var(--panel);padding-bottom:8px}
 .labcam .paperview{max-height:42vh;aspect-ratio:4/3}
 .labcam .paperview video{height:100%;object-fit:contain}
+.pvflip{position:absolute;right:8px;top:8px;z-index:2;background:rgba(0,0,0,.65);color:#fff;border:0;border-radius:999px;padding:6px 12px;font-size:13px;font-weight:700}
 .pvoff{position:absolute;inset:0;display:grid;place-items:center;color:#fff;font-size:14px;text-align:center;padding:16px}
 body.labopen{overflow:hidden}
 .paperview{position:relative;max-width:420px;width:100%;margin:0 auto;border-radius:12px;overflow:hidden;background:#000}
@@ -173,7 +174,7 @@ svg text{fill:var(--muted);font-family:var(--font-num);font-size:11px}
 <div class="wrap">
   <header>
     <div>
-      <h1>얼굴 수평계 <span class="sub">실험실 · 버전 <span id="appVer">11.08-d</span></span></h1>
+      <h1>얼굴 수평계 <span class="sub">실험실 · 버전 <span id="appVer">11.08-e</span></span></h1>
       <div class="sub">4주 동안 매일 측정해서, 폰 카메라가 내 얼굴을 얼마나 정확하게 재는지 증명해요.</div>
     </div>
     <div class="row"><button class="primary" id="btnLabOpen">🧪 정답 시험실</button><span class="sub" id="engineState">준비 전</span></div>
@@ -357,7 +358,7 @@ svg text{fill:var(--muted);font-family:var(--font-num);font-size:11px}
   <section class="panel lab" id="paperPanel" aria-label="정답 시험실" hidden>
     <div class="labhead"><h2>🧪 정답 시험실</h2><div class="row"><button id="btnLabReset">↺ 처음부터 다시</button><button id="btnLabClose">✕ 닫기</button></div></div>
     <div class="confirm" id="labResetAsk" hidden><span>지금까지 잰 시험 결과를 지우고 <b>1단계부터</b> 다시 할까요? 만들어 둔 정답 종이(세트)는 그대로 둬요.</span><button class="danger" id="labResetYes">네, 다시 할게요</button><button id="labResetNo">아니요</button></div>
-    <div class="labcam"><div class="paperview" id="paperView"><video id="paperVid" playsinline muted></video><div class="pvtag" id="paperVidTag">카메라 꺼짐</div><div class="pvoff" id="paperOff">아래 버튼을 누르면 카메라가 켜져요</div></div>
+    <div class="labcam"><div class="paperview" id="paperView"><video id="paperVid" playsinline muted></video><div class="pvtag" id="paperVidTag">카메라 꺼짐</div><button class="pvflip" id="btnPvFlip">🔄 카메라 바꾸기</button><div class="pvoff" id="paperOff">아래 버튼을 누르면 카메라가 켜져요</div></div>
     <div class="memo guide" id="paperGuideBox">
       <b>지금 할 일</b>
       <details class="note"><summary>처음이면 먼저 읽기: 자리 잡는 법</summary>
@@ -1870,6 +1871,7 @@ async function openLab(){
 }
 function closeLab(){ $('paperPanel').hidden=true; document.body.classList.remove('labopen'); }
 $('btnLabOpen').onclick=openLab; $('btnLabClose').onclick=closeLab;
+$('btnPvFlip').onclick=async()=>{ $('btnPvFlip').disabled=true; try{ $('camSel').value=$('camSel').value==='user'?'environment':'user'; if(running) await startCamera(); else await ensureRunning(); }catch(e){} finally{ $('btnPvFlip').disabled=false; renderPaper(); } };
 $('btnLabReset').onclick=()=>{ $('labResetAsk').hidden=false; };
 $('labResetNo').onclick=()=>{ $('labResetAsk').hidden=true; };
 $('labResetYes').onclick=()=>{ const P0=paperDB(); P0.tests=P0.tests.filter(t=>t.set!==P0.cur); const si=P0.sets.find(x=>x.id===P0.cur); if(si) si.faceReady=false; paperLast=''; save(); $('labResetAsk').hidden=true; $('paperMeasureMsg').textContent='';
@@ -1905,11 +1907,11 @@ function renderGuide(T){
   const setInfo=P0.sets.find(x=>x.id===P0.cur)||{};
   if(face&&!setInfo.faceReady){
     box.innerHTML=`<div class="big">종이 시험 끝! 🎉 이제 <b>내 얼굴</b> 차례예요</div>
-      <div class="note"><b>1)</b> 폰 거치대를 <b>반대로 돌려서</b> 폰 화면이 <b>나를 보게</b> 해요(또는 책을 치우고 화면 쪽에 앉아도 돼요).<br>
-      <b>2)</b> 폰에서 <b>50~60cm</b> 떨어져 앉아요. 지금부터 폰은 다시 <b>고정</b>이에요.<br>
-      <b>3)</b> 앞면 카메라(화면 위 작은 렌즈) 양옆 <b>5cm·10cm</b>에 스티커를 붙여요.<br>
-      <b>4)</b> 준비되면 아래 버튼 → 앞면 카메라가 켜져요.</div>
-      <button class="primary big" id="btnFaceReady">돌렸어요 · 앞면 카메라 켜기</button>${bar}`;
+      <div class="note"><b>폰은 그대로 둬요.</b> 카메라만 앞면(화면 쪽)으로 바꿀게요.<br>
+      <b>1)</b> 형은 <b>폰 화면 쪽</b>에 앉아요(폰에서 <b>50~60cm</b>). 앞면 카메라는 화면 쪽을 봐요.<br>
+      <b>2)</b> 앞면 카메라(화면 위 작은 렌즈) 양옆 <b>5cm·10cm</b>에 스티커를 붙여요.<br>
+      <b>3)</b> 아래 버튼을 누르면 앞면 카메라로 바뀌어요.</div>
+      <button class="primary big" id="btnFaceReady">앞면 카메라로 바꾸기</button>${bar}`;
     $('btnFaceReady').onclick=async()=>{
       $('btnFaceReady').disabled=true; setInfo.faceReady=true; save();
       try{ $('camSel').value='user'; if(running) await startCamera(); else await ensureRunning(); }catch(e){}
